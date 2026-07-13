@@ -1,0 +1,106 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  admin
+  vendor
+  accountant
+}
+
+enum InvoiceStatus {
+  pending
+  approved
+  rejected
+  paid
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      Role
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Site {
+  id        String   @id @default(cuid())
+  siteCode  Int      @unique @default(autoincrement())
+  name      String
+  location  String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  invoices Invoice[]
+}
+
+model Task {
+  id        String   @id @default(cuid())
+  name      String
+  unit      String
+  unitCost  Decimal?
+  isCustom  Boolean  @default(false)
+  isActive  Boolean  @default(true)
+  createdBy String
+  createdAt DateTime @default(now())
+
+  rateHistory TaskRateHistory[]
+  invoices    Invoice[]
+}
+
+model TaskRateHistory {
+  id        String   @id @default(cuid())
+  taskId    String
+  oldRate   Decimal?
+  newRate   Decimal
+  changedBy String
+  changedAt DateTime @default(now())
+
+  task Task @relation(fields: [taskId], references: [id])
+}
+
+model Invoice {
+  id                   String        @id @default(cuid())
+  taskId               String
+  siteId               String
+  vendorId             String
+  unit                 String
+  quantity             Decimal
+  unitCostSnapshot     Decimal?
+  amount               Decimal
+  description          String?
+  attachmentUrl        String?
+
+  status               InvoiceStatus @default(pending)
+
+  rejectionReason      String?
+  rejectionReasonOther String?
+
+  deleteRequested      Boolean   @default(false)
+  deleteRequestedBy    String?
+  deleteRequestedAt    DateTime?
+  deleteApprovedBy     String?
+  deleteDecisionAt     DateTime?
+
+  submittedAt          DateTime  @default(now())
+  approvedBy           String?
+  approvedAt           DateTime?
+  paidBy               String?
+  paidAt               DateTime?
+  paymentRef           String?
+
+  syncVersion          Int       @default(1)
+  updatedAt            DateTime  @updatedAt
+
+  task Task @relation(fields: [taskId], references: [id])
+  site Site @relation(fields: [siteId], references: [id])
+}

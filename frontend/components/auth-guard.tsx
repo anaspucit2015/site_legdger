@@ -1,0 +1,31 @@
+'use client';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { getToken, getUser, AuthUser } from '@/lib/auth';
+
+type Props = {
+  children: React.ReactNode;
+  allowedRoles?: AuthUser['role'][];
+};
+
+export function AuthGuard({ children, allowedRoles }: Props) {
+  const router = useRouter();
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    const token = getToken();
+    const user = getUser();
+    if (!token || !user) {
+      router.replace('/login');
+      return;
+    }
+    if (allowedRoles && !allowedRoles.includes(user.role)) {
+      router.replace('/login');
+      return;
+    }
+    setReady(true);
+  }, [router, allowedRoles]);
+
+  if (!ready) return null;
+  return <>{children}</>;
+}

@@ -1,0 +1,169 @@
+@import "tailwindcss";
+
+/* ── Design tokens ─────────────────────────────────────── */
+:root {
+  --navy:   #1B3A5C;
+  --amber:  #E8A33D;
+  --green:  #2F9E6E;
+  --rust:   #C4522E;
+  --paper:  #F6F5F1;
+  --white:  #FFFFFF;
+
+  --text-primary:   #1B3A5C;
+  --text-secondary: #5A6A7A;
+  --text-muted:     #8C9BAB;
+  --border:         #E0DDD6;
+}
+
+@theme inline {
+  --color-navy:   var(--navy);
+  --color-amber:  var(--amber);
+  --color-green:  var(--green);
+  --color-rust:   var(--rust);
+  --color-paper:  var(--paper);
+
+  --font-heading: var(--font-heading);
+  --font-body:    var(--font-body);
+  --font-mono:    var(--font-mono);
+}
+
+/* ── Base ──────────────────────────────────────────────── */
+body {
+  background: var(--paper);
+  color: var(--text-primary);
+  font-family: var(--font-body), Inter, sans-serif;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading), 'Space Grotesk', sans-serif;
+  color: var(--navy);
+}
+
+/* Amounts and numbers */
+.font-ledger {
+  font-family: var(--font-mono), 'IBM Plex Mono', monospace;
+}
+
+/* ── Inputs ────────────────────────────────────────────── */
+input,
+textarea,
+select {
+  color: #000000;
+  background: var(--white);
+}
+
+
+/* ── Buttons ───────────────────────────────────────────── */
+.btn-primary {
+  background: var(--navy);
+  color: white;
+  border-radius: 8px;
+  padding: 8px 18px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  font-family: var(--font-body), Inter, sans-serif;
+  transition: background 0.15s;
+  border: none;
+  cursor: pointer;
+}
+.btn-primary:hover   { background: #162f4d; }
+.btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.btn-outline {
+  background: transparent;
+  color: var(--navy);
+  border: 1.5px solid var(--navy);
+  border-radius: 8px;
+  padding: 8px 18px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  font-family: var(--font-body), Inter, sans-serif;
+  transition: background 0.15s;
+  cursor: pointer;
+}
+.btn-outline:hover { background: #f0f4f8; }
+
+.btn-danger {
+  background: var(--rust);
+  color: white;
+  border-radius: 8px;
+  padding: 8px 18px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  font-family: var(--font-body), Inter, sans-serif;
+  transition: background 0.15s;
+  border: none;
+  cursor: pointer;
+}
+.btn-danger:hover { background: #a83e24; }
+.btn-danger:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* ── Cards ─────────────────────────────────────────────── */
+.card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+/* ── Table ─────────────────────────────────────────────── */
+.sl-table {
+  width: 100%;
+  font-size: 0.875rem;
+  border-collapse: collapse;
+}
+.sl-table thead th {
+  text-align: left;
+  padding: 10px 16px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  background: var(--paper);
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-body), Inter, sans-serif;
+}
+.sl-table tbody tr {
+  border-bottom: 1px solid var(--border);
+  transition: background 0.1s;
+}
+.sl-table tbody tr:last-child { border-bottom: none; }
+.sl-table tbody tr:hover { background: #faf9f6; }
+.sl-table tbody td {
+  padding: 12px 16px;
+  color: var(--text-primary);
+}
+
+/* ── Form inputs (scoped class) ────────────────────────── */
+.sl-input {
+  width: 100%;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-size: 0.875rem;
+  font-family: var(--font-body), Inter, sans-serif;
+  color: #000;
+  background: var(--white);
+  outline: none;
+  transition: border-color 0.15s;
+}
+.sl-input:focus { border-color: var(--navy); }
+
+/* ── Modal overlay ─────────────────────────────────────── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(27, 58, 92, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+.modal-box {
+  background: var(--white);
+  border-radius: 16px;
+  padding: 28px;
+  width: 100%;
+  max-width: 440px;
+  box-shadow: 0 20px 60px rgba(27,58,92,0.15);
+}
