@@ -132,7 +132,7 @@ export default function MyInvoicesPage() {
                         </span>
                         <button
                           onClick={(e) => handleInfoClick(e, inv)}
-                          className="flex items-center justify-center w-6 h-6 rounded-full"
+                          className="flex items-center justify-center w-6 h-6 rounded-full cursor-pointer"
                           style={{
                             color: infoTarget?.inv.id === inv.id ? 'var(--navy)' : 'var(--text-muted)',
                             background: infoTarget?.inv.id === inv.id ? 'var(--border)' : 'transparent',

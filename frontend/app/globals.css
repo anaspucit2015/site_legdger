@@ -27,6 +27,16 @@
   --font-mono:    var(--font-mono);
 }
 
+/* ── Cursor ────────────────────────────────────────────── */
+button,
+a,
+select,
+label[for],
+[role="button"],
+[tabindex]:not([tabindex="-1"]) {
+  cursor: pointer;
+}
+
 /* ── Base ──────────────────────────────────────────────── */
 body {
   background: var(--paper);

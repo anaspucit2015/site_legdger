@@ -40,7 +40,7 @@ export function Modal({ open, onClose, title, subtitle, children, maxWidth = 440
             </div>
             <Dialog.Close asChild>
               <button
-                className="rounded-lg p-1 transition-colors"
+                className="rounded-lg p-1 transition-colors cursor-pointer"
                 style={{ color: 'var(--text-muted)' }}
                 onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--paper)')}
                 onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}

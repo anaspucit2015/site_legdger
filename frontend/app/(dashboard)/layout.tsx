@@ -103,7 +103,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
             <button
               onClick={() => { clearAuth(); router.replace('/login'); }}
-              className="flex items-center gap-2 px-3 py-2 w-full rounded-lg text-sm transition-all"
+              className="flex items-center gap-2 px-3 py-2 w-full rounded-lg text-sm transition-all cursor-pointer"
               style={{ color: 'rgba(255,255,255,0.45)', fontFamily: 'var(--font-body)' }}
               onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}
               onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}

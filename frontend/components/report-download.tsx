@@ -210,7 +210,7 @@ export function ReportDownload() {
                   key={p.value}
                   type="button"
                   onClick={() => setPreset(p.value)}
-                  className="px-3 py-1.5 rounded-lg text-sm font-medium transition-all"
+                  className="px-3 py-1.5 rounded-lg text-sm font-medium transition-all cursor-pointer"
                   style={{
                     background: preset === p.value ? 'var(--navy)' : 'var(--paper)',
                     color:      preset === p.value ? '#fff' : 'var(--text-secondary)',
