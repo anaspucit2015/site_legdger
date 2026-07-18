@@ -70,7 +70,8 @@ model TaskRateHistory {
 
 model Invoice {
   id                   String        @id @default(cuid())
-  taskId               String
+  taskId               String?
+  customTaskName       String?
   siteId               String
   vendorId             String
   unit                 String
@@ -101,6 +102,6 @@ model Invoice {
   syncVersion          Int       @default(1)
   updatedAt            DateTime  @updatedAt
 
-  task Task @relation(fields: [taskId], references: [id])
-  site Site @relation(fields: [siteId], references: [id])
+  task Task? @relation(fields: [taskId], references: [id])
+  site Site  @relation(fields: [siteId], references: [id])
 }

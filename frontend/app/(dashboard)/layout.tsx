@@ -6,7 +6,7 @@ import { AuthGuard } from '@/components/auth-guard';
 import { Logo } from '@/components/logo';
 import {
   FileText, Trash2, ListChecks, MapPin, Users,
-  PlusCircle, Wallet, LogOut, LayoutDashboard, ClipboardList,
+  PlusCircle, Wallet, LogOut, LayoutDashboard, ClipboardList, BarChart2,
 } from 'lucide-react';
 
 const navByRole = {
@@ -17,6 +17,7 @@ const navByRole = {
     { label: 'Tasks',           href: '/admin/tasks',                    icon: ListChecks },
     { label: 'Sites',           href: '/admin/sites',                    icon: MapPin },
     { label: 'Users',           href: '/admin/users',                    icon: Users },
+    { label: 'Reports',         href: '/admin/reports',                  icon: BarChart2 },
   ],
   vendor: [
     { label: 'My Invoices',    href: '/vendor/my-invoices',  icon: ClipboardList },
@@ -25,6 +26,7 @@ const navByRole = {
   ],
   accountant: [
     { label: 'Invoices', href: '/accountant/invoices', icon: Wallet },
+    { label: 'Reports',  href: '/accountant/reports',  icon: BarChart2 },
   ],
 };
 
@@ -63,7 +65,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {/* Nav items */}
           <nav className="flex-1 px-3 py-4 space-y-0.5">
             {nav.map(({ label, href, icon: Icon }) => {
-              const active = pathname === href || (href !== '/' && href !== '/admin' && pathname.startsWith(href + '/'));
+              const active = pathname === href;
               return (
                 <Link
                   key={href}

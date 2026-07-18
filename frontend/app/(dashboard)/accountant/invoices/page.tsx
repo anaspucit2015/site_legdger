@@ -69,7 +69,7 @@ export default function AccountantInvoicesPage() {
               <Tr key={inv.id}>
                 <Td>
                   <p className="font-medium" style={{ color: 'var(--navy)' }}>{inv.site?.name ?? '—'}</p>
-                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{inv.task?.name ?? '—'}</p>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{inv.task?.name ?? inv.customTaskName ?? '—'}</p>
                 </Td>
                 <Td mono muted>{inv.vendorId.slice(-8)}</Td>
                 <Td mono muted>{inv.quantity} {inv.unit}</Td>
@@ -104,7 +104,7 @@ export default function AccountantInvoicesPage() {
         open={!!payTarget}
         onClose={() => setPayTarget(null)}
         title="Release Payment"
-        subtitle={payTarget ? `${payTarget.site?.name} · ${payTarget.task?.name}` : undefined}
+        subtitle={payTarget ? `${payTarget.site?.name} · ${payTarget.task?.name ?? payTarget.customTaskName}` : undefined}
       >
         <div className="space-y-4">
           {payTarget && (

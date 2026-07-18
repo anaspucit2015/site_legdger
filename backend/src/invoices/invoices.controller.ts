@@ -40,6 +40,7 @@ export class InvoicesController {
     @Query('siteId') siteId?: string,
     @Query('vendorId') vendorId?: string,
     @Query('status') status?: string,
+    @Query('mine') mine?: string,
   ) {
     const { role } = req.user;
 
@@ -51,9 +52,14 @@ export class InvoicesController {
       return this.invoicesService.findForAccountant({ siteId, status });
     }
 
-    // vendor: no siteId → own invoices; with siteId → all invoices for that site
+    // vendor + mine=true → own invoices only (My Invoices page), site filter still applies
+    if (mine === 'true') {
+      return this.invoicesService.findAll({ vendorId: req.user.id, siteId, status });
+    }
+
+    // vendor: no siteId → own invoices; with siteId → all invoices for that site (Site Invoices page)
     if (!siteId) return this.invoicesService.findAll({ vendorId: req.user.id, status });
-    return this.invoicesService.findBySite(siteId);
+    return this.invoicesService.findAll({ siteId, status });
   }
 
   // ─── Admin: pending delete requests queue ─────────────────────────────────

@@ -37,7 +37,7 @@ export default function DeleteRequestsPage() {
               <Tr key={inv.id}>
                 <Td>
                   <p className="font-medium" style={{ color: 'var(--navy)' }}>{inv.site?.name ?? '—'}</p>
-                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{inv.task?.name ?? '—'}</p>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{inv.task?.name ?? inv.customTaskName ?? '—'}</p>
                 </Td>
                 <Td mono bold>Rs. {Number(inv.amount).toLocaleString()}</Td>
                 <Td muted>{inv.deleteRequestedAt ? new Date(inv.deleteRequestedAt).toLocaleDateString() : '—'}</Td>

@@ -2,7 +2,8 @@ import { baseApi } from './baseApi';
 
 export type Invoice = {
   id: string;
-  taskId: string;
+  taskId: string | null;
+  customTaskName: string | null;
   siteId: string;
   vendorId: string;
   unit: string;
@@ -20,18 +21,19 @@ export type Invoice = {
   approvedAt: string | null;
   paidAt: string | null;
   paymentRef: string | null;
-  task?: { name: string; unit: string };
+  task?: { name: string; unit: string } | null;
   site?: { name: string };
 };
 
 export const invoicesApi = baseApi.injectEndpoints({
   endpoints: (build) => ({
-    getInvoices: build.query<Invoice[], { siteId?: string; vendorId?: string; status?: string }>({
+    getInvoices: build.query<Invoice[], { siteId?: string; vendorId?: string; status?: string; mine?: boolean }>({
       query: (params) => {
         const qs = new URLSearchParams();
         if (params.siteId) qs.set('siteId', params.siteId);
         if (params.vendorId) qs.set('vendorId', params.vendorId);
         if (params.status) qs.set('status', params.status);
+        if (params.mine) qs.set('mine', 'true');
         return `/invoices?${qs}`;
       },
       providesTags: ['Invoice'],
@@ -40,7 +42,7 @@ export const invoicesApi = baseApi.injectEndpoints({
       query: (id) => `/invoices/${id}`,
       providesTags: ['Invoice'],
     }),
-    createInvoice: build.mutation<Invoice, { siteId: string; taskId: string; quantity: string; amount?: string; description?: string }>({
+    createInvoice: build.mutation<Invoice, { siteId: string; taskId?: string; customTaskName?: string; customTaskUnit?: string; customTaskUnitCost?: string; quantity: string; amount?: string; description?: string }>({
       query: (body) => ({ url: '/invoices', method: 'POST', body }),
       invalidatesTags: ['Invoice'],
     }),

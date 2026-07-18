@@ -70,7 +70,7 @@ export function InvoiceDetailModal({ invoice: inv, onClose }: Props) {
       open={!!inv}
       onClose={onClose}
       title="Invoice Details"
-      subtitle={`${inv.site?.name ?? '—'} · ${inv.task?.name ?? '—'}`}
+      subtitle={`${inv.site?.name ?? '—'} · ${inv.task?.name ?? inv.customTaskName ?? '—'}`}
     >
       {/* Amount + status hero */}
       <div
@@ -89,7 +89,7 @@ export function InvoiceDetailModal({ invoice: inv, onClose }: Props) {
       {/* Detail rows */}
       <div className="mb-5">
         <Row label="Site"       value={inv.site?.name ?? '—'} />
-        <Row label="Task"       value={inv.task?.name ?? '—'} />
+        <Row label="Task"       value={inv.task?.name ?? inv.customTaskName ?? '—'} />
         <Row label="Quantity"   value={`${Number(inv.quantity).toLocaleString()} ${inv.unit}`} mono />
         {inv.unitCostSnapshot && (
           <Row label="Rate"     value={`Rs. ${Number(inv.unitCostSnapshot).toLocaleString()} / ${inv.unit}`} mono />

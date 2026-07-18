@@ -84,7 +84,7 @@ export default function AdminInvoicesPage() {
               <Tr key={inv.id}>
                 <Td>
                   <p className="font-medium" style={{ color: 'var(--navy)' }}>{inv.site?.name ?? '—'}</p>
-                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{inv.task?.name ?? '—'}</p>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{inv.task?.name ?? inv.customTaskName ?? '—'}</p>
                 </Td>
                 <Td mono muted>{inv.quantity} {inv.unit}</Td>
                 <Td mono bold>Rs. {Number(inv.amount).toLocaleString()}</Td>
@@ -119,7 +119,7 @@ export default function AdminInvoicesPage() {
         open={!!rejectTarget}
         onClose={() => { setRejectTarget(null); setRejectionReason(''); setRejectionReasonOther(''); }}
         title="Reject Invoice"
-        subtitle={rejectTarget ? `${rejectTarget.site?.name} · ${rejectTarget.task?.name} · Rs. ${Number(rejectTarget.amount).toLocaleString()}` : undefined}
+        subtitle={rejectTarget ? `${rejectTarget.site?.name} · ${rejectTarget.task?.name ?? rejectTarget.customTaskName} · Rs. ${Number(rejectTarget.amount).toLocaleString()}` : undefined}
       >
         <div className="space-y-3">
           <Select

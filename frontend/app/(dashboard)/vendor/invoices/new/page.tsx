@@ -13,6 +13,7 @@ export default function NewInvoicePage() {
   const router = useRouter();
   const { data: sites = [] } = useGetActiveSitesQuery();
   const { data: tasks = [] } = useGetTasksQuery({ active: true });
+
   const [siteId, setSiteId] = useState('');
   const [taskId, setTaskId] = useState('');
   const [quantity, setQuantity] = useState('');
@@ -20,13 +21,27 @@ export default function NewInvoicePage() {
   const [description, setDescription] = useState('');
   const [error, setError] = useState('');
 
+  // Custom task mode
+  const [isCustomMode, setIsCustomMode] = useState(false);
+  const [customTaskName, setCustomTaskName] = useState('');
+  const [customTaskUnit, setCustomTaskUnit] = useState('');
+  const [customTaskUnitCost, setCustomTaskUnitCost] = useState('');
+
   const [createInvoice, { isLoading }] = useCreateInvoiceMutation();
 
   const selectedTask = tasks.find((t) => t.id === taskId);
-  const isCustom = selectedTask?.isCustom ?? false;
+  const isLegacyCustom = selectedTask?.isCustom ?? false;
+
+  // Auto-calculated amount for predefined tasks
   const previewAmount =
-    selectedTask && !isCustom && selectedTask.unitCost && quantity
-      ? (parseFloat(selectedTask.unitCost) * parseFloat(quantity))
+    !isCustomMode && selectedTask && !isLegacyCustom && selectedTask.unitCost && quantity
+      ? parseFloat(selectedTask.unitCost) * parseFloat(quantity)
+      : null;
+
+  // Auto-calculated amount for vendor custom tasks
+  const customPreviewAmount =
+    isCustomMode && customTaskUnitCost && quantity
+      ? parseFloat(customTaskUnitCost) * parseFloat(quantity)
       : null;
 
   const siteOptions = sites.map((s) => ({ value: s.id, label: s.name }));
@@ -35,22 +50,48 @@ export default function NewInvoicePage() {
     label: `${t.name} · ${t.unit}${t.unitCost ? ` · Rs. ${Number(t.unitCost).toLocaleString()}/unit` : ' (custom amount)'}`,
   }));
 
+  function handleToggleCustomMode() {
+    setIsCustomMode((prev) => !prev);
+    // Reset the other mode's fields
+    setTaskId('');
+    setQuantity('');
+    setAmount('');
+    setCustomTaskName('');
+    setCustomTaskUnit('');
+    setCustomTaskUnitCost('');
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
     try {
-      await createInvoice({
-        siteId,
-        taskId,
-        quantity,
-        ...(isCustom ? { amount } : {}),
-        ...(description ? { description } : {}),
-      }).unwrap();
-      router.push('/vendor/invoices');
+      if (isCustomMode) {
+        await createInvoice({
+          siteId,
+          customTaskName,
+          customTaskUnit,
+          customTaskUnitCost,
+          quantity,
+          ...(description ? { description } : {}),
+        }).unwrap();
+      } else {
+        await createInvoice({
+          siteId,
+          taskId,
+          quantity,
+          ...(isLegacyCustom ? { amount } : {}),
+          ...(description ? { description } : {}),
+        }).unwrap();
+      }
+      router.push('/vendor/my-invoices');
     } catch (err: any) {
       setError(err?.data?.message ?? 'Failed to submit invoice');
     }
   }
+
+  const canSubmit = isCustomMode
+    ? !isLoading && !!siteId && !!customTaskName && !!customTaskUnit && !!customTaskUnitCost && !!quantity
+    : !isLoading && !!siteId && !!taskId && !!quantity && (!isLegacyCustom || !!amount);
 
   return (
     <div>
@@ -69,17 +110,64 @@ export default function NewInvoicePage() {
             placeholder="Select site…"
           />
 
-          <Select
-            label="Task"
-            value={taskId}
-            onChange={setTaskId}
-            options={taskOptions}
-            placeholder="Select task…"
-          />
+          {!isCustomMode && (
+            <Select
+              label="Task"
+              value={taskId}
+              onChange={setTaskId}
+              options={taskOptions}
+              placeholder="Select task…"
+            />
+          )}
 
-          {taskId && (
+          {/* Custom task toggle */}
+          <label className="flex items-center gap-2 cursor-pointer" style={{ width: 'fit-content' }}>
+            <input
+              type="checkbox"
+              checked={isCustomMode}
+              onChange={handleToggleCustomMode}
+              className="w-4 h-4 cursor-pointer"
+              style={{ accentColor: 'var(--navy)' }}
+            />
+            <span className="text-sm font-medium" style={{ color: 'var(--navy)' }}>Custom task</span>
+          </label>
+
+          {/* Custom task fields */}
+          {isCustomMode && (
+            <div className="space-y-4 rounded-xl p-4" style={{ background: '#f5f6fa', border: '1.5px solid var(--border)' }}>
+              <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Custom Task</p>
+              <Input
+                label="Task Name"
+                required
+                placeholder="e.g. Brick laying, Plastering…"
+                value={customTaskName}
+                onChange={(e) => setCustomTaskName(e.target.value)}
+              />
+              <Input
+                label="Unit"
+                required
+                placeholder="e.g. sqft, bags, labor"
+                value={customTaskUnit}
+                onChange={(e) => setCustomTaskUnit(e.target.value)}
+              />
+              <Input
+                label="Unit Cost (PKR / unit)"
+                required
+                type="number"
+                step="0.01"
+                min="0.01"
+                mono
+                placeholder="0.00"
+                value={customTaskUnitCost}
+                onChange={(e) => setCustomTaskUnitCost(e.target.value)}
+              />
+            </div>
+          )}
+
+          {/* Quantity */}
+          {(taskId || isCustomMode) && (
             <Input
-              label={`Quantity (${selectedTask?.unit ?? ''})`}
+              label={`Quantity${isCustomMode && customTaskUnit ? ` (${customTaskUnit})` : selectedTask ? ` (${selectedTask.unit})` : ''}`}
               required
               type="number"
               step="0.01"
@@ -90,7 +178,8 @@ export default function NewInvoicePage() {
             />
           )}
 
-          {isCustom && taskId && (
+          {/* Legacy custom task: manual amount */}
+          {isLegacyCustom && taskId && (
             <Input
               label="Total Amount (PKR)"
               required
@@ -103,11 +192,12 @@ export default function NewInvoicePage() {
             />
           )}
 
-          {previewAmount !== null && (
+          {/* Auto-calculated totals */}
+          {(previewAmount !== null || customPreviewAmount !== null) && (
             <div className="rounded-xl px-4 py-3.5" style={{ background: '#edf7f2', border: '1.5px dashed var(--green)' }}>
               <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--green)' }}>Auto-calculated amount</p>
               <p className="font-ledger text-xl font-semibold" style={{ color: 'var(--navy)' }}>
-                Rs. {previewAmount.toLocaleString()}
+                Rs. {(previewAmount ?? customPreviewAmount!).toLocaleString()}
               </p>
               <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Locked on submission — cannot be edited</p>
             </div>
@@ -129,7 +219,7 @@ export default function NewInvoicePage() {
             <Button
               type="submit"
               loading={isLoading}
-              disabled={isLoading || !siteId || !taskId || !quantity}
+              disabled={!canSubmit}
             >
               {isLoading ? 'Submitting…' : 'Submit Invoice'}
             </Button>

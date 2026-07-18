@@ -11,10 +11,21 @@ import {
 } from '@/components/ui';
 import { Eye } from 'lucide-react';
 
+const STATUS_OPTIONS = [
+  { value: 'pending',  label: 'Pending'  },
+  { value: 'approved', label: 'Approved' },
+  { value: 'rejected', label: 'Rejected' },
+  { value: 'paid',     label: 'Paid'     },
+];
+
 export default function VendorInvoicesPage() {
   const { data: sites = [] } = useGetActiveSitesQuery();
-  const [selectedSite, setSelectedSite] = useState('');
-  const { data: invoices = [], isLoading } = useGetInvoicesQuery({ siteId: selectedSite }, { skip: !selectedSite });
+  const [selectedSite, setSelectedSite]     = useState('');
+  const [statusFilter, setStatusFilter]     = useState('');
+  const { data: invoices = [], isLoading } = useGetInvoicesQuery(
+    { siteId: selectedSite, ...(statusFilter ? { status: statusFilter } : {}) },
+    { skip: !selectedSite },
+  );
   const [viewTarget, setViewTarget] = useState<Invoice | null>(null);
 
   const siteOptions = sites.map((s) => ({ value: s.id, label: s.name }));
@@ -25,12 +36,20 @@ export default function VendorInvoicesPage() {
         title="Site Invoices"
         subtitle="All invoices submitted on this site — across all vendors"
         action={
-          <NativeSelect
-            value={selectedSite}
-            onChange={setSelectedSite}
-            options={siteOptions}
-            placeholder="Select site…"
-          />
+          <div className="flex gap-2">
+            <NativeSelect
+              value={selectedSite}
+              onChange={setSelectedSite}
+              options={siteOptions}
+              placeholder="Select site…"
+            />
+            <NativeSelect
+              value={statusFilter}
+              onChange={setStatusFilter}
+              options={STATUS_OPTIONS}
+              placeholder="All statuses"
+            />
+          </div>
         }
       />
 
@@ -55,7 +74,7 @@ export default function VendorInvoicesPage() {
           <TBody>
             {invoices.map((inv) => (
               <Tr key={inv.id}>
-                <Td bold>{inv.task?.name ?? '—'}</Td>
+                <Td bold>{inv.task?.name ?? inv.customTaskName ?? '—'}</Td>
                 <Td mono muted>{inv.quantity} {inv.unit}</Td>
                 <Td mono bold>Rs. {Number(inv.amount).toLocaleString()}</Td>
                 <Td>

@@ -20,30 +20,48 @@ export class InvoicesService {
   // ─── Create ────────────────────────────────────────────────────────────────
 
   async create(dto: CreateInvoiceDto, vendorId: string) {
-    const task = await this.prisma.task.findUnique({ where: { id: dto.taskId } });
-    if (!task) throw new NotFoundException('Task not found');
-    if (!task.isActive) throw new BadRequestException('Task is no longer active');
-
     let amount: Decimal;
     let unitCostSnapshot: Decimal | null = null;
+    let unit: string;
+    let taskId: string | null = null;
 
-    if (task.isCustom) {
-      // Custom task: vendor provides total amount manually
-      if (!dto.amount) throw new BadRequestException('amount is required for custom tasks');
-      amount = new Decimal(dto.amount);
+    if (dto.taskId) {
+      // Predefined task flow
+      const task = await this.prisma.task.findUnique({ where: { id: dto.taskId } });
+      if (!task) throw new NotFoundException('Task not found');
+      if (!task.isActive) throw new BadRequestException('Task is no longer active');
+
+      unit = task.unit;
+      taskId = task.id;
+
+      if (task.isCustom && !task.unitCost) {
+        // Admin-created custom task with no rate: vendor provides total amount
+        if (!dto.amount) throw new BadRequestException('amount is required for custom tasks');
+        amount = new Decimal(dto.amount);
+      } else {
+        if (!task.unitCost) throw new BadRequestException('Task has no unit cost set');
+        unitCostSnapshot = task.unitCost;
+        amount = task.unitCost.mul(new Decimal(dto.quantity));
+      }
     } else {
-      // Predefined task: auto-calculate, lock snapshot
-      if (!task.unitCost) throw new BadRequestException('Task has no unit cost set');
-      unitCostSnapshot = task.unitCost;
-      amount = task.unitCost.mul(new Decimal(dto.quantity));
+      // Vendor custom task: stored directly on invoice, no Task record created
+      if (!dto.customTaskName || !dto.customTaskUnit || !dto.customTaskUnitCost) {
+        throw new BadRequestException(
+          'customTaskName, customTaskUnit, and customTaskUnitCost are required when taskId is not provided',
+        );
+      }
+      unit = dto.customTaskUnit;
+      unitCostSnapshot = new Decimal(dto.customTaskUnitCost);
+      amount = unitCostSnapshot.mul(new Decimal(dto.quantity));
     }
 
     return this.prisma.invoice.create({
       data: {
-        taskId: dto.taskId,
+        taskId,
+        customTaskName: dto.taskId ? null : (dto.customTaskName ?? null),
         siteId: dto.siteId,
         vendorId,
-        unit: task.unit,
+        unit,
         quantity: dto.quantity,
         unitCostSnapshot,
         amount,

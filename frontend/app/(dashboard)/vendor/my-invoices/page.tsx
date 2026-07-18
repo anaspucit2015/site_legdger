@@ -9,7 +9,8 @@ import {
   Table, THead, TBody, Th, Tr, Td, TableEmpty, TableLoading,
   PageHeader,
 } from '@/components/ui';
-import { Eye, Trash2, Info } from 'lucide-react';
+import { Eye, Trash2, Info, Plus } from 'lucide-react';
+import Link from 'next/link';
 
 const STATUS_OPTIONS = [
   { value: 'pending',  label: 'Pending'  },
@@ -34,7 +35,8 @@ export default function MyInvoicesPage() {
 
   // No siteId in query → backend returns this vendor's own invoices
   const { data: invoices = [], isLoading } = useGetInvoicesQuery({
-    ...(siteFilter ? { siteId: siteFilter } : {}),
+    mine: true,
+    ...(siteFilter   ? { siteId:  siteFilter   } : {}),
     ...(statusFilter ? { status: statusFilter } : {}),
   });
 
@@ -52,6 +54,13 @@ export default function MyInvoicesPage() {
         }
         action={
           <div className="flex gap-2">
+            <Link
+              href="/vendor/invoices/new"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all"
+              style={{ background: 'var(--navy)', color: '#fff' }}
+            >
+              <Plus size={14} /> New Invoice
+            </Link>
             <NativeSelect
               value={siteFilter}
               onChange={setSiteFilter}
@@ -89,7 +98,7 @@ export default function MyInvoicesPage() {
               <Tr key={inv.id}>
                 <Td>
                   <p className="font-medium" style={{ color: 'var(--navy)' }}>{inv.site?.name ?? '—'}</p>
-                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{inv.task?.name ?? '—'}</p>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{inv.task?.name ?? inv.customTaskName ?? '—'}</p>
                 </Td>
                 <Td mono muted>{inv.quantity} {inv.unit}</Td>
                 <Td mono bold>Rs. {Number(inv.amount).toLocaleString()}</Td>

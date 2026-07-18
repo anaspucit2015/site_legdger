@@ -204,7 +204,7 @@ export default function AdminDashboard() {
                   >
                     <td className="px-4 py-3">
                       <p className="font-medium" style={{ color: 'var(--navy)' }}>{inv.site?.name ?? '—'}</p>
-                      <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{inv.task?.name ?? '—'}</p>
+                      <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{inv.task?.name ?? inv.customTaskName ?? '—'}</p>
                     </td>
                     <td className="px-4 py-3 font-semibold" style={{ color: 'var(--navy)', fontFamily: 'var(--font-mono)' }}>
                       Rs. {Number(inv.amount).toLocaleString()}

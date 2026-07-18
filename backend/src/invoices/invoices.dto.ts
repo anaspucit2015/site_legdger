@@ -4,13 +4,27 @@ export class CreateInvoiceDto {
   @IsString()
   siteId: string;
 
+  // Either taskId OR all three customTask* fields must be provided
+  @IsOptional()
   @IsString()
-  taskId: string;
+  taskId?: string;
+
+  @IsOptional()
+  @IsString()
+  customTaskName?: string;
+
+  @IsOptional()
+  @IsString()
+  customTaskUnit?: string;
+
+  @IsOptional()
+  @IsDecimal()
+  customTaskUnitCost?: string;
 
   @IsDecimal()
   quantity: string;
 
-  // Custom task fields (only when task.isCustom = true)
+  // Only for admin-created tasks with isCustom=true and no unitCost
   @IsOptional()
   @IsDecimal()
   amount?: string;
