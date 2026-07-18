@@ -94,7 +94,7 @@ export function InvoiceDetailModal({ invoice: inv, onClose }: Props) {
         {inv.unitCostSnapshot && (
           <Row label="Rate"     value={`Rs. ${Number(inv.unitCostSnapshot).toLocaleString()} / ${inv.unit}`} mono />
         )}
-        <Row label="Vendor ID"  value={<span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem' }}>{inv.vendorId.slice(-12)}</span>} />
+        <Row label="Vendor" value={inv.vendor?.name ?? inv.vendorId.slice(-12)} />
         <Row label="Submitted"  value={new Date(inv.submittedAt).toLocaleDateString('en-PK', { day: 'numeric', month: 'short', year: 'numeric' })} />
         {isPaid && inv.paymentRef && (
           <Row label="Payment Ref" value={inv.paymentRef} mono />

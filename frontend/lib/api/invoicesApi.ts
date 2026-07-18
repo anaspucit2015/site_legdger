@@ -23,6 +23,7 @@ export type Invoice = {
   paymentRef: string | null;
   task?: { name: string; unit: string } | null;
   site?: { name: string };
+  vendor?: { name: string } | null;
 };
 
 export const invoicesApi = baseApi.injectEndpoints({

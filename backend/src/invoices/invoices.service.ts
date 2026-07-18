@@ -69,21 +69,22 @@ export class InvoicesService {
         attachmentUrl: dto.attachmentUrl ?? null,
         status: 'pending',
       },
-      include: { task: true, site: true },
+      include: { task: true, site: true, vendor: { select: { name: true } } },
     });
   }
 
   // ─── Read ──────────────────────────────────────────────────────────────────
 
-  // Admin: all invoices, filterable
+  // Admin: all invoices, filterable — excludes delete-requested (those are in their own queue)
   findAll(filters: { siteId?: string; vendorId?: string; status?: string }) {
     return this.prisma.invoice.findMany({
       where: {
+        deleteRequested: false,
         ...(filters.siteId && { siteId: filters.siteId }),
         ...(filters.vendorId && { vendorId: filters.vendorId }),
         ...(filters.status && { status: filters.status as any }),
       },
-      include: { task: true, site: true },
+      include: { task: true, site: true, vendor: { select: { name: true } } },
       orderBy: { submittedAt: 'desc' },
     });
   }
@@ -92,7 +93,7 @@ export class InvoicesService {
   findBySite(siteId: string) {
     return this.prisma.invoice.findMany({
       where: { siteId },
-      include: { task: true, site: true },
+      include: { task: true, site: true, vendor: { select: { name: true } } },
       orderBy: { submittedAt: 'desc' },
     });
   }
@@ -105,7 +106,7 @@ export class InvoicesService {
         ...(filters.siteId && { siteId: filters.siteId }),
         ...(filters.status && { status: filters.status as any }),
       },
-      include: { task: true, site: true },
+      include: { task: true, site: true, vendor: { select: { name: true } } },
       orderBy: { approvedAt: 'desc' },
     });
   }
@@ -113,7 +114,7 @@ export class InvoicesService {
   async findOne(id: string) {
     const invoice = await this.prisma.invoice.findUnique({
       where: { id },
-      include: { task: true, site: true },
+      include: { task: true, site: true, vendor: { select: { name: true } } },
     });
     if (!invoice) throw new NotFoundException('Invoice not found');
     return invoice;
@@ -145,7 +146,7 @@ export class InvoicesService {
         ...(dto.attachmentUrl !== undefined && { attachmentUrl: dto.attachmentUrl }),
         syncVersion: { increment: 1 },
       },
-      include: { task: true, site: true },
+      include: { task: true, site: true, vendor: { select: { name: true } } },
     });
   }
 
@@ -174,6 +175,8 @@ export class InvoicesService {
 
   async approve(id: string, adminId: string) {
     const invoice = await this.findOne(id);
+    if (invoice.deleteRequested)
+      throw new BadRequestException('Cannot approve an invoice with a pending deletion request');
     if (invoice.status !== 'pending')
       throw new BadRequestException('Only pending invoices can be approved');
 
@@ -187,6 +190,8 @@ export class InvoicesService {
 
   async reject(id: string, dto: RejectInvoiceDto, adminId: string) {
     const invoice = await this.findOne(id);
+    if (invoice.deleteRequested)
+      throw new BadRequestException('Cannot reject an invoice with a pending deletion request');
     if (invoice.status !== 'pending')
       throw new BadRequestException('Only pending invoices can be rejected');
     if (dto.rejectionReason === 'Other' && !dto.rejectionReasonOther)
@@ -227,7 +232,7 @@ export class InvoicesService {
   findPendingDeleteRequests() {
     return this.prisma.invoice.findMany({
       where: { deleteRequested: true, deleteApprovedBy: null },
-      include: { task: true, site: true },
+      include: { task: true, site: true, vendor: { select: { name: true } } },
       orderBy: { deleteRequestedAt: 'asc' },
     });
   }

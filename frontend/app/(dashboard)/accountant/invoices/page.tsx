@@ -21,14 +21,20 @@ export default function AccountantInvoicesPage() {
   const [releasePayment] = useReleasePaymentMutation();
 
   const [viewTarget, setViewTarget] = useState<Invoice | null>(null);
-  const [payTarget, setPayTarget] = useState<Invoice | null>(null);
+  const [payTarget, setPayTarget]   = useState<Invoice | null>(null);
   const [paymentRef, setPaymentRef] = useState('');
+  const [paying, setPaying]         = useState(false);
 
   async function handlePay() {
     if (!payTarget) return;
-    await releasePayment({ id: payTarget.id, paymentRef });
-    setPayTarget(null);
-    setPaymentRef('');
+    setPaying(true);
+    try {
+      await releasePayment({ id: payTarget.id, paymentRef });
+      setPayTarget(null);
+      setPaymentRef('');
+    } finally {
+      setPaying(false);
+    }
   }
 
   const totalAmount = invoices.reduce((sum, inv) => sum + Number(inv.amount), 0);
@@ -56,7 +62,7 @@ export default function AccountantInvoicesPage() {
           <THead>
             <tr>
               <Th>Site / Task</Th>
-              <Th>Vendor ID</Th>
+              <Th>Vendor</Th>
               <Th>Quantity</Th>
               <Th>Amount (PKR)</Th>
               <Th>Status</Th>
@@ -71,7 +77,7 @@ export default function AccountantInvoicesPage() {
                   <p className="font-medium" style={{ color: 'var(--navy)' }}>{inv.site?.name ?? '—'}</p>
                   <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{inv.task?.name ?? inv.customTaskName ?? '—'}</p>
                 </Td>
-                <Td mono muted>{inv.vendorId.slice(-8)}</Td>
+                <Td muted>{inv.vendor?.name ?? '—'}</Td>
                 <Td mono muted>{inv.quantity} {inv.unit}</Td>
                 <Td mono bold>Rs. {Number(inv.amount).toLocaleString()}</Td>
                 <Td><StatusStamp status={inv.status} /></Td>
@@ -120,8 +126,8 @@ export default function AccountantInvoicesPage() {
             placeholder="e.g. TXN-2026-001 / Bank Ref"
           />
           <div className="flex gap-3 justify-end">
-            <Button variant="outline" onClick={() => setPayTarget(null)}>Cancel</Button>
-            <Button onClick={handlePay} disabled={!paymentRef}>Confirm Payment</Button>
+            <Button variant="outline" disabled={paying} onClick={() => setPayTarget(null)}>Cancel</Button>
+            <Button loading={paying} disabled={!paymentRef} onClick={handlePay}>Confirm Payment</Button>
           </div>
         </div>
       </Modal>

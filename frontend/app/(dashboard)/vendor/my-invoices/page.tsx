@@ -9,7 +9,7 @@ import {
   Table, THead, TBody, Th, Tr, Td, TableEmpty, TableLoading,
   PageHeader,
 } from '@/components/ui';
-import { Eye, Trash2, Info, Plus } from 'lucide-react';
+import { Eye, Info, Plus } from 'lucide-react';
 import Link from 'next/link';
 
 const STATUS_OPTIONS = [
@@ -26,6 +26,12 @@ export default function MyInvoicesPage() {
   const [viewTarget, setViewTarget] = useState<Invoice | null>(null);
   const [infoTarget, setInfoTarget] = useState<{ inv: Invoice; top: number; left: number } | null>(null);
   const [requestDelete] = useRequestDeleteInvoiceMutation();
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  async function handleRequestDelete(id: string) {
+    setDeletingId(id);
+    try { await requestDelete(id); } finally { setDeletingId(null); }
+  }
 
   function handleInfoClick(e: React.MouseEvent<HTMLButtonElement>, inv: Invoice) {
     if (infoTarget?.inv.id === inv.id) { setInfoTarget(null); return; }
@@ -104,7 +110,7 @@ export default function MyInvoicesPage() {
                 <Td mono bold>Rs. {Number(inv.amount).toLocaleString()}</Td>
                 <Td>
                   <div>
-                    <StatusStamp status={inv.status} />
+                    <StatusStamp status={inv.deleteRequested ? 'delete_requested' : inv.status} />
                     {inv.status === 'rejected' && inv.rejectionReason && (
                       <p className="text-xs mt-1" style={{ color: 'var(--rust)' }}>{inv.rejectionReason}</p>
                     )}
@@ -117,32 +123,23 @@ export default function MyInvoicesPage() {
                       <Eye size={13} /> View
                     </Button>
                     {inv.status === 'pending' && !inv.deleteRequested && (
-                      <Button size="sm" variant="ghost" onClick={() => requestDelete(inv.id)} style={{ color: 'var(--rust)' }}>
+                      <Button size="sm" variant="ghost" loading={deletingId === inv.id} disabled={!!deletingId} onClick={() => handleRequestDelete(inv.id)} style={{ color: 'var(--rust)' }}>
                         Request Delete
                       </Button>
                     )}
                     {inv.deleteRequested && (
-                      <div className="flex items-center gap-1.5">
-                        <span
-                          className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full"
-                          style={{ background: '#FDF0ED', color: 'var(--rust)', fontWeight: 500 }}
-                        >
-                          <Trash2 size={10} />
-                          Delete Requested
-                        </span>
-                        <button
-                          onClick={(e) => handleInfoClick(e, inv)}
-                          className="flex items-center justify-center w-6 h-6 rounded-full cursor-pointer"
-                          style={{
-                            color: infoTarget?.inv.id === inv.id ? 'var(--navy)' : 'var(--text-muted)',
-                            background: infoTarget?.inv.id === inv.id ? 'var(--border)' : 'transparent',
-                          }}
-                          onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--border)')}
-                          onMouseLeave={(e) => (e.currentTarget.style.background = infoTarget?.inv.id === inv.id ? 'var(--border)' : 'transparent')}
-                        >
-                          <Info size={13} />
-                        </button>
-                      </div>
+                      <button
+                        onClick={(e) => handleInfoClick(e, inv)}
+                        className="flex items-center justify-center w-6 h-6 rounded-full cursor-pointer"
+                        style={{
+                          color: infoTarget?.inv.id === inv.id ? 'var(--navy)' : 'var(--text-muted)',
+                          background: infoTarget?.inv.id === inv.id ? 'var(--border)' : 'transparent',
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--border)')}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = infoTarget?.inv.id === inv.id ? 'var(--border)' : 'transparent')}
+                      >
+                        <Info size={13} />
+                      </button>
                     )}
                   </div>
                 </Td>

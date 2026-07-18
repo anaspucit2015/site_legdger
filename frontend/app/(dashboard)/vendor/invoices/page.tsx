@@ -64,6 +64,7 @@ export default function VendorInvoicesPage() {
           <THead>
             <tr>
               <Th>Task</Th>
+              <Th>Vendor</Th>
               <Th>Quantity</Th>
               <Th>Amount (PKR)</Th>
               <Th>Status</Th>
@@ -75,6 +76,7 @@ export default function VendorInvoicesPage() {
             {invoices.map((inv) => (
               <Tr key={inv.id}>
                 <Td bold>{inv.task?.name ?? inv.customTaskName ?? '—'}</Td>
+                <Td muted>{inv.vendor?.name ?? '—'}</Td>
                 <Td mono muted>{inv.quantity} {inv.unit}</Td>
                 <Td mono bold>Rs. {Number(inv.amount).toLocaleString()}</Td>
                 <Td>

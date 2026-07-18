@@ -1,10 +1,11 @@
-type Status = 'pending' | 'approved' | 'rejected' | 'paid';
+type Status = 'pending' | 'approved' | 'rejected' | 'paid' | 'delete_requested';
 
 const config: Record<Status, { label: string; bg: string; color: string; dot: string }> = {
-  pending:  { label: 'Pending',  bg: '#FFF8EC', color: '#B87A1A', dot: '#E8A33D' },
-  approved: { label: 'Approved', bg: '#EDF7F2', color: '#1E6E49', dot: '#2F9E6E' },
-  rejected: { label: 'Rejected', bg: '#FDF0ED', color: '#9E3A21', dot: '#C4522E' },
-  paid:     { label: 'Paid',     bg: '#EEF2F7', color: '#1B3A5C', dot: '#1B3A5C' },
+  pending:          { label: 'Pending',          bg: '#FFF8EC', color: '#B87A1A', dot: '#E8A33D' },
+  approved:         { label: 'Approved',         bg: '#EDF7F2', color: '#1E6E49', dot: '#2F9E6E' },
+  rejected:         { label: 'Rejected',         bg: '#FDF0ED', color: '#9E3A21', dot: '#C4522E' },
+  paid:             { label: 'Paid',             bg: '#EEF2F7', color: '#1B3A5C', dot: '#1B3A5C' },
+  delete_requested: { label: 'Delete Requested', bg: '#FDF0ED', color: '#7A2318', dot: '#C4522E' },
 };
 
 export function StatusStamp({ status }: { status: Status }) {

@@ -35,17 +35,29 @@ export default function AdminInvoicesPage() {
   const [approve] = useApproveInvoiceMutation();
   const [reject] = useRejectInvoiceMutation();
 
-  const [viewTarget, setViewTarget] = useState<Invoice | null>(null);
-  const [rejectTarget, setRejectTarget] = useState<Invoice | null>(null);
-  const [rejectionReason, setRejectionReason] = useState('');
+  const [viewTarget, setViewTarget]         = useState<Invoice | null>(null);
+  const [rejectTarget, setRejectTarget]     = useState<Invoice | null>(null);
+  const [rejectionReason, setRejectionReason]           = useState('');
   const [rejectionReasonOther, setRejectionReasonOther] = useState('');
+  const [approvingId, setApprovingId] = useState<string | null>(null);
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
+
+  async function handleApprove(id: string) {
+    setApprovingId(id);
+    try { await approve(id); } finally { setApprovingId(null); }
+  }
 
   async function handleRejectSubmit() {
     if (!rejectTarget) return;
-    await reject({ id: rejectTarget.id, rejectionReason, ...(rejectionReason === 'Other' ? { rejectionReasonOther } : {}) });
-    setRejectTarget(null);
-    setRejectionReason('');
-    setRejectionReasonOther('');
+    setRejectingId(rejectTarget.id);
+    try {
+      await reject({ id: rejectTarget.id, rejectionReason, ...(rejectionReason === 'Other' ? { rejectionReasonOther } : {}) });
+      setRejectTarget(null);
+      setRejectionReason('');
+      setRejectionReasonOther('');
+    } finally {
+      setRejectingId(null);
+    }
   }
 
   return (
@@ -72,6 +84,7 @@ export default function AdminInvoicesPage() {
           <THead>
             <tr>
               <Th>Site / Task</Th>
+              <Th>Vendor</Th>
               <Th>Quantity</Th>
               <Th>Amount (PKR)</Th>
               <Th>Status</Th>
@@ -86,6 +99,7 @@ export default function AdminInvoicesPage() {
                   <p className="font-medium" style={{ color: 'var(--navy)' }}>{inv.site?.name ?? '—'}</p>
                   <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{inv.task?.name ?? inv.customTaskName ?? '—'}</p>
                 </Td>
+                <Td muted>{inv.vendor?.name ?? '—'}</Td>
                 <Td mono muted>{inv.quantity} {inv.unit}</Td>
                 <Td mono bold>Rs. {Number(inv.amount).toLocaleString()}</Td>
                 <Td><StatusStamp status={inv.status} /></Td>
@@ -97,10 +111,10 @@ export default function AdminInvoicesPage() {
                     </Button>
                     {inv.status === 'pending' && (
                       <>
-                        <Button size="sm" variant="primary" onClick={() => approve(inv.id)}>
+                        <Button size="sm" variant="primary" loading={approvingId === inv.id} disabled={!!approvingId || !!rejectingId} onClick={() => handleApprove(inv.id)}>
                           <Check size={13} /> Approve
                         </Button>
-                        <Button size="sm" variant="outline" onClick={() => setRejectTarget(inv)}>
+                        <Button size="sm" variant="outline" disabled={!!approvingId || !!rejectingId} onClick={() => setRejectTarget(inv)}>
                           <X size={13} /> Reject
                         </Button>
                       </>
@@ -139,8 +153,8 @@ export default function AdminInvoicesPage() {
             />
           )}
           <div className="flex gap-3 justify-end pt-1">
-            <Button variant="outline" onClick={() => setRejectTarget(null)}>Cancel</Button>
-            <Button variant="danger" onClick={handleRejectSubmit} disabled={!rejectionReason}>
+            <Button variant="outline" disabled={!!rejectingId} onClick={() => setRejectTarget(null)}>Cancel</Button>
+            <Button variant="danger" loading={!!rejectingId} disabled={!rejectionReason} onClick={handleRejectSubmit}>
               Confirm Reject
             </Button>
           </div>

@@ -29,6 +29,8 @@ model User {
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  invoices  Invoice[] @relation("VendorInvoices")
 }
 
 model Site {
@@ -102,6 +104,7 @@ model Invoice {
   syncVersion          Int       @default(1)
   updatedAt            DateTime  @updatedAt
 
-  task Task? @relation(fields: [taskId], references: [id])
-  site Site  @relation(fields: [siteId], references: [id])
+  task   Task? @relation(fields: [taskId], references: [id])
+  site   Site  @relation(fields: [siteId], references: [id])
+  vendor User  @relation("VendorInvoices", fields: [vendorId], references: [id])
 }
