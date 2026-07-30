@@ -8,6 +8,7 @@ import {
   Button, Input, Textarea, Select,
   PageHeader,
 } from '@/components/ui';
+import { ReceiptUpload } from '@/components/receipt-upload';
 
 export default function NewInvoicePage() {
   const router = useRouter();
@@ -19,6 +20,7 @@ export default function NewInvoicePage() {
   const [quantity, setQuantity] = useState('');
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
+  const [attachmentUrl, setAttachmentUrl] = useState('');
   const [error, setError] = useState('');
 
   // Custom task mode
@@ -73,6 +75,7 @@ export default function NewInvoicePage() {
           customTaskUnitCost,
           quantity,
           ...(description ? { description } : {}),
+          ...(attachmentUrl ? { attachmentUrl } : {}),
         }).unwrap();
       } else {
         await createInvoice({
@@ -81,6 +84,7 @@ export default function NewInvoicePage() {
           quantity,
           ...(isLegacyCustom ? { amount } : {}),
           ...(description ? { description } : {}),
+          ...(attachmentUrl ? { attachmentUrl } : {}),
         }).unwrap();
       }
       router.push('/vendor/my-invoices');
@@ -208,6 +212,11 @@ export default function NewInvoicePage() {
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={2}
+          />
+
+          <ReceiptUpload
+            onUploadComplete={(url) => setAttachmentUrl(url)}
+            onClear={() => setAttachmentUrl('')}
           />
 
           {error && (

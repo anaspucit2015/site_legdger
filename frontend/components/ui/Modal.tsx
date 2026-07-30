@@ -20,11 +20,11 @@ export function Modal({ open, onClose, title, subtitle, children, maxWidth = 440
           style={{ background: 'rgba(27,58,92,0.35)' }}
         />
         <Dialog.Content
-          className="fixed z-50 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100vw-2rem)] rounded-2xl shadow-2xl focus:outline-none"
-          style={{ background: 'white', maxWidth, padding: '28px' }}
+          className="fixed z-50 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100vw-2rem)] rounded-2xl shadow-2xl focus:outline-none flex flex-col"
+          style={{ background: 'white', maxWidth, maxHeight: 'calc(100vh - 3rem)' }}
         >
-          {/* Header */}
-          <div className="flex items-start justify-between mb-5">
+          {/* Header — sticky */}
+          <div className="flex items-start justify-between shrink-0" style={{ padding: '28px 28px 20px' }}>
             <div>
               <Dialog.Title
                 className="text-lg font-bold"
@@ -49,7 +49,10 @@ export function Modal({ open, onClose, title, subtitle, children, maxWidth = 440
               </button>
             </Dialog.Close>
           </div>
-          {children}
+          {/* Scrollable body */}
+          <div className="overflow-y-auto min-h-0" style={{ padding: '0 28px 28px' }}>
+            {children}
+          </div>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

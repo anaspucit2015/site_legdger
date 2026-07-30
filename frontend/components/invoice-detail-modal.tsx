@@ -2,7 +2,7 @@
 import { Invoice } from '@/lib/api/invoicesApi';
 import { Modal } from '@/components/ui';
 import { StatusStamp } from '@/components/status-stamp';
-import { CheckCircle, Clock, CreditCard, XCircle, Trash2 } from 'lucide-react';
+import { CheckCircle, Clock, CreditCard, XCircle, Trash2, ExternalLink } from 'lucide-react';
 
 function Row({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) {
   return (
@@ -71,6 +71,7 @@ export function InvoiceDetailModal({ invoice: inv, onClose }: Props) {
       onClose={onClose}
       title="Invoice Details"
       subtitle={`${inv.site?.name ?? '—'} · ${inv.task?.name ?? inv.customTaskName ?? '—'}`}
+      maxWidth={640}
     >
       {/* Amount + status hero */}
       <div
@@ -100,6 +101,29 @@ export function InvoiceDetailModal({ invoice: inv, onClose }: Props) {
           <Row label="Payment Ref" value={inv.paymentRef} mono />
         )}
       </div>
+
+      {/* Receipt photo */}
+      {inv.attachmentUrl && (
+        <div className="mb-5">
+          <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--text-muted)' }}>Receipt</p>
+          <div className="relative inline-block">
+            <a href={inv.attachmentUrl} target="_blank" rel="noopener noreferrer">
+              <img
+                src={inv.attachmentUrl}
+                alt="Receipt"
+                className="rounded-xl object-cover"
+                style={{ width: 220, height: 220, border: '1.5px solid var(--border)', display: 'block' }}
+              />
+              <div
+                className="absolute inset-0 rounded-xl flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity"
+                style={{ background: 'rgba(27,42,76,0.55)' }}
+              >
+                <ExternalLink size={22} color="white" />
+              </div>
+            </a>
+          </div>
+        </div>
+      )}
 
       {/* Description */}
       {inv.description && (

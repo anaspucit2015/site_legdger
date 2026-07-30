@@ -8,6 +8,7 @@ import {
   Button, Input, Textarea, Select,
   PageHeader,
 } from '@/components/ui';
+import { ReceiptUpload } from '@/components/receipt-upload';
 
 export default function AccountantNewInvoicePage() {
   const router = useRouter();
@@ -19,6 +20,7 @@ export default function AccountantNewInvoicePage() {
   const [quantity, setQuantity] = useState('');
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
+  const [attachmentUrl, setAttachmentUrl] = useState('');
   const [error, setError] = useState('');
 
   const [isCustomMode, setIsCustomMode] = useState(false);
@@ -69,6 +71,7 @@ export default function AccountantNewInvoicePage() {
           customTaskUnitCost,
           quantity,
           ...(description ? { description } : {}),
+          ...(attachmentUrl ? { attachmentUrl } : {}),
         }).unwrap();
       } else {
         await createInvoice({
@@ -77,6 +80,7 @@ export default function AccountantNewInvoicePage() {
           quantity,
           ...(isLegacyCustom ? { amount } : {}),
           ...(description ? { description } : {}),
+          ...(attachmentUrl ? { attachmentUrl } : {}),
         }).unwrap();
       }
       router.push('/accountant/my-invoices');
@@ -199,6 +203,11 @@ export default function AccountantNewInvoicePage() {
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={2}
+          />
+
+          <ReceiptUpload
+            onUploadComplete={(url) => setAttachmentUrl(url)}
+            onClear={() => setAttachmentUrl('')}
           />
 
           {error && (
