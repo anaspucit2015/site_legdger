@@ -43,7 +43,7 @@ export const invoicesApi = baseApi.injectEndpoints({
       query: (id) => `/invoices/${id}`,
       providesTags: ['Invoice'],
     }),
-    createInvoice: build.mutation<Invoice, { siteId: string; taskId?: string; customTaskName?: string; customTaskUnit?: string; customTaskUnitCost?: string; quantity: string; amount?: string; description?: string }>({
+    createInvoice: build.mutation<Invoice, { siteId: string; taskId?: string; customTaskName?: string; customTaskUnit?: string; customTaskUnitCost?: string; quantity: string; amount?: string; description?: string; status?: 'pending' | 'approved' | 'paid' }>({
       query: (body) => ({ url: '/invoices', method: 'POST', body }),
       invalidatesTags: ['Invoice'],
     }),
