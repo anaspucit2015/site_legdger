@@ -19,7 +19,7 @@ export class InvoicesService {
 
   // ─── Create ────────────────────────────────────────────────────────────────
 
-  async create(dto: CreateInvoiceDto, vendorId: string) {
+  async create(dto: CreateInvoiceDto, vendorId: string, role?: string) {
     let amount: Decimal;
     let unitCostSnapshot: Decimal | null = null;
     let unit: string;
@@ -55,6 +55,9 @@ export class InvoicesService {
       amount = unitCostSnapshot.mul(new Decimal(dto.quantity));
     }
 
+    const status = (role === 'admin' && dto.status) ? dto.status : 'pending';
+    const now = new Date();
+
     return this.prisma.invoice.create({
       data: {
         taskId,
@@ -67,7 +70,9 @@ export class InvoicesService {
         amount,
         description: dto.description ?? null,
         attachmentUrl: dto.attachmentUrl ?? null,
-        status: 'pending',
+        status,
+        ...(status === 'approved' && { approvedBy: vendorId, approvedAt: now }),
+        ...(status === 'paid' && { approvedBy: vendorId, approvedAt: now, paidBy: vendorId, paidAt: now }),
       },
       include: { task: true, site: true, vendor: { select: { name: true } } },
     });

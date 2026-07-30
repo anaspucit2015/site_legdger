@@ -25,12 +25,12 @@ import { Roles } from '../common/decorators/roles.decorator';
 export class InvoicesController {
   constructor(private invoicesService: InvoicesService) {}
 
-  // ─── Vendor: Submit invoice ────────────────────────────────────────────────
+  // ─── Submit invoice (vendor, admin, accountant) ───────────────────────────
   @UseGuards(RolesGuard)
-  @Roles('vendor')
+  @Roles('vendor', 'admin', 'accountant')
   @Post()
   create(@Body() dto: CreateInvoiceDto, @Req() req: any) {
-    return this.invoicesService.create(dto, req.user.id);
+    return this.invoicesService.create(dto, req.user.id, req.user.role);
   }
 
   // ─── Read: role-based visibility ──────────────────────────────────────────
@@ -44,17 +44,17 @@ export class InvoicesController {
   ) {
     const { role } = req.user;
 
+    // mine=true → own submissions only, works for all roles
+    if (mine === 'true') {
+      return this.invoicesService.findAll({ vendorId: req.user.id, siteId, status });
+    }
+
     if (role === 'admin') {
       return this.invoicesService.findAll({ siteId, vendorId, status });
     }
 
     if (role === 'accountant') {
       return this.invoicesService.findForAccountant({ siteId, status });
-    }
-
-    // vendor + mine=true → own invoices only (My Invoices page), site filter still applies
-    if (mine === 'true') {
-      return this.invoicesService.findAll({ vendorId: req.user.id, siteId, status });
     }
 
     // vendor: no siteId → own invoices; with siteId → all invoices for that site (Site Invoices page)

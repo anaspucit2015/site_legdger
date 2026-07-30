@@ -36,6 +36,11 @@ export class CreateInvoiceDto {
   @IsOptional()
   @IsString()
   attachmentUrl?: string;
+
+  // Admin-only: set invoice status at creation time
+  @IsOptional()
+  @IsIn(['pending', 'approved', 'paid'])
+  status?: 'pending' | 'approved' | 'paid';
 }
 
 export class UpdateInvoiceDto {
