@@ -4,12 +4,15 @@ import { useGetDeleteRequestsQuery, useResolveDeleteRequestMutation } from '@/li
 import {
   Button,
   Table, THead, TBody, Th, Tr, Td, TableEmpty, TableLoading,
-  PageHeader,
+  PageHeader, Pagination,
 } from '@/components/ui';
 import { Trash2, X } from 'lucide-react';
 
 export default function DeleteRequestsPage() {
-  const { data: invoices = [], isLoading } = useGetDeleteRequestsQuery();
+  const [page, setPage] = useState(1);
+  const { data: result, isLoading } = useGetDeleteRequestsQuery({ page });
+  const invoices = result?.data ?? [];
+  const total = result?.total ?? 0;
   const [resolve] = useResolveDeleteRequestMutation();
   const [resolvingId, setResolvingId] = useState<string | null>(null);
 
@@ -63,6 +66,7 @@ export default function DeleteRequestsPage() {
           </TBody>
         </Table>
       )}
+      <Pagination page={page} total={total} limit={20} onChange={setPage} />
     </div>
   );
 }

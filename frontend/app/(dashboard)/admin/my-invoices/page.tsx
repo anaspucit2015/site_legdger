@@ -7,7 +7,7 @@ import { InvoiceDetailModal } from '@/components/invoice-detail-modal';
 import {
   Button, NativeSelect,
   Table, THead, TBody, Th, Tr, Td, TableEmpty, TableLoading,
-  PageHeader,
+  PageHeader, Pagination,
 } from '@/components/ui';
 import { Eye, Plus } from 'lucide-react';
 import Link from 'next/link';
@@ -24,12 +24,16 @@ export default function AdminMyInvoicesPage() {
   const [siteFilter, setSiteFilter]     = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [viewTarget, setViewTarget]     = useState<Invoice | null>(null);
+  const [page, setPage] = useState(1);
 
-  const { data: invoices = [], isLoading } = useGetInvoicesQuery({
+  const { data: result, isLoading } = useGetInvoicesQuery({
     mine: true,
     ...(siteFilter   ? { siteId: siteFilter   } : {}),
     ...(statusFilter ? { status: statusFilter } : {}),
+    page,
   });
+  const invoices = result?.data ?? [];
+  const total = result?.total ?? 0;
 
   const siteOptions  = sites.map((s) => ({ value: s.id, label: s.name }));
   const totalAmount  = invoices.reduce((s, i) => s + Number(i.amount), 0);
@@ -39,8 +43,8 @@ export default function AdminMyInvoicesPage() {
       <PageHeader
         title="My Invoices"
         subtitle={
-          invoices.length > 0
-            ? `${invoices.length} invoice${invoices.length !== 1 ? 's' : ''} · Rs. ${totalAmount.toLocaleString()}`
+          total > 0
+            ? `${total} invoice${total !== 1 ? 's' : ''} · Rs. ${totalAmount.toLocaleString()}`
             : 'Invoices you have personally submitted'
         }
         action={
@@ -54,13 +58,13 @@ export default function AdminMyInvoicesPage() {
             </Link>
             <NativeSelect
               value={siteFilter}
-              onChange={setSiteFilter}
+              onChange={(val) => { setSiteFilter(val); setPage(1); }}
               options={siteOptions}
               placeholder="All sites"
             />
             <NativeSelect
               value={statusFilter}
-              onChange={setStatusFilter}
+              onChange={(val) => { setStatusFilter(val); setPage(1); }}
               options={STATUS_OPTIONS}
               placeholder="All statuses"
             />
@@ -118,6 +122,7 @@ export default function AdminMyInvoicesPage() {
           </TBody>
         </Table>
       )}
+      <Pagination page={page} total={total} limit={20} onChange={setPage} />
 
       <InvoiceDetailModal invoice={viewTarget} onClose={() => setViewTarget(null)} />
     </div>

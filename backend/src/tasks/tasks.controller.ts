@@ -31,9 +31,9 @@ export class TasksController {
 
   // All roles — all tasks (with ?active=true for vendor dropdown)
   @Get()
-  findAll(@Query('active') active: string) {
+  findAll(@Query('active') active: string, @Query('page') page?: string, @Query('limit') limit?: string) {
     if (active === 'true') return this.tasksService.findAllActive();
-    return this.tasksService.findAll();
+    return this.tasksService.findAll(Number(page) || 1, Number(limit) || 20);
   }
 
   // All roles — single task

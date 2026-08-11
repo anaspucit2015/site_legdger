@@ -4,12 +4,15 @@ import { useGetVendorsQuery, useCreateVendorMutation, useDeactivateVendorMutatio
 import {
   Button, Input, Modal,
   Table, THead, TBody, Th, Tr, Td, TableLoading,
-  PageHeader,
+  PageHeader, Pagination,
 } from '@/components/ui';
 import { Plus } from 'lucide-react';
 
 export default function AdminVendorsPage() {
-  const { data: vendors = [], isLoading } = useGetVendorsQuery();
+  const [page, setPage] = useState(1);
+  const { data: result, isLoading } = useGetVendorsQuery({ page });
+  const vendors = result?.data ?? [];
+  const total = result?.total ?? 0;
   const [createVendor, { isLoading: creating }] = useCreateVendorMutation();
   const [deactivate] = useDeactivateVendorMutation();
   const [showForm, setShowForm] = useState(false);
@@ -110,6 +113,7 @@ export default function AdminVendorsPage() {
           </TBody>
         </Table>
       )}
+      <Pagination page={page} total={total} limit={20} onChange={setPage} />
 
       <Modal open={showForm} onClose={() => setShowForm(false)} title="Add Vendor">
         <form onSubmit={handleCreate} className="space-y-3">

@@ -19,11 +19,18 @@ export class TasksService {
     });
   }
 
-  findAll() {
-    return this.prisma.task.findMany({
-      include: { rateHistory: { orderBy: { changedAt: 'desc' } } },
-      orderBy: { createdAt: 'desc' },
-    });
+  async findAll(page = 1, limit = 20) {
+    const skip = (page - 1) * limit;
+    const [data, total] = await Promise.all([
+      this.prisma.task.findMany({
+        include: { rateHistory: { orderBy: { changedAt: 'desc' } } },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.task.count(),
+    ]);
+    return { data, total, page, limit };
   }
 
   findAllActive() {

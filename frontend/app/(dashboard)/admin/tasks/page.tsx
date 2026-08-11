@@ -4,12 +4,15 @@ import { useGetTasksQuery, useCreateTaskMutation, useUpdateTaskMutation, useDeac
 import {
   Button, Input, Modal,
   Table, THead, TBody, Th, Tr, Td, TableEmpty, TableLoading,
-  PageHeader,
+  PageHeader, Pagination,
 } from '@/components/ui';
 import { Plus } from 'lucide-react';
 
 export default function AdminTasksPage() {
-  const { data: tasks = [], isLoading } = useGetTasksQuery();
+  const [page, setPage] = useState(1);
+  const { data: result, isLoading } = useGetTasksQuery({ page });
+  const tasks = (result && 'data' in result ? result.data : result) ?? [];
+  const total = (result && 'total' in result ? result.total : 0) ?? 0;
   const [createTask, { isLoading: creating }] = useCreateTaskMutation();
   const [updateTask] = useUpdateTaskMutation();
   const [deactivate] = useDeactivateTaskMutation();
@@ -108,6 +111,7 @@ export default function AdminTasksPage() {
           </TBody>
         </Table>
       )}
+      <Pagination page={page} total={total} limit={20} onChange={setPage} />
 
       {/* Create task modal */}
       <Modal open={showForm} onClose={() => setShowForm(false)} title="Add Task">

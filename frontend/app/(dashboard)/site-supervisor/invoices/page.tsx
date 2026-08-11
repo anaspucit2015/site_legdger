@@ -7,7 +7,7 @@ import { InvoiceDetailModal } from '@/components/invoice-detail-modal';
 import {
   Button, NativeSelect,
   Table, THead, TBody, Th, Tr, Td, TableEmpty, TableLoading,
-  PageHeader,
+  PageHeader, Pagination,
 } from '@/components/ui';
 import { Eye } from 'lucide-react';
 
@@ -22,10 +22,13 @@ export default function SiteSupervisorInvoicesPage() {
   const { data: sites = [] } = useGetActiveSitesQuery();
   const [selectedSite, setSelectedSite]     = useState('');
   const [statusFilter, setStatusFilter]     = useState('');
-  const { data: invoices = [], isLoading } = useGetInvoicesQuery(
-    { siteId: selectedSite, ...(statusFilter ? { status: statusFilter } : {}) },
+  const [page, setPage] = useState(1);
+  const { data: result, isLoading } = useGetInvoicesQuery(
+    { siteId: selectedSite, ...(statusFilter ? { status: statusFilter } : {}), page },
     { skip: !selectedSite },
   );
+  const invoices = result?.data ?? [];
+  const total = result?.total ?? 0;
   const [viewTarget, setViewTarget] = useState<Invoice | null>(null);
 
   const siteOptions = sites.map((s) => ({ value: s.id, label: s.name }));
@@ -39,13 +42,13 @@ export default function SiteSupervisorInvoicesPage() {
           <div className="flex gap-2">
             <NativeSelect
               value={selectedSite}
-              onChange={setSelectedSite}
+              onChange={(val) => { setSelectedSite(val); setPage(1); }}
               options={siteOptions}
               placeholder="Select site…"
             />
             <NativeSelect
               value={statusFilter}
-              onChange={setStatusFilter}
+              onChange={(val) => { setStatusFilter(val); setPage(1); }}
               options={STATUS_OPTIONS}
               placeholder="All statuses"
             />
@@ -102,6 +105,7 @@ export default function SiteSupervisorInvoicesPage() {
           </TBody>
         </Table>
       )}
+      <Pagination page={page} total={total} limit={20} onChange={setPage} />
       <InvoiceDetailModal invoice={viewTarget} onClose={() => setViewTarget(null)} />
     </div>
   );

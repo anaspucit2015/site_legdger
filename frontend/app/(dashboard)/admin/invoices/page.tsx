@@ -13,7 +13,7 @@ import { StatusStamp } from '@/components/status-stamp';
 import {
   Button, Select, Textarea, Input, NativeSelect, Modal,
   Table, THead, TBody, Th, Tr, Td, TableEmpty, TableLoading,
-  PageHeader,
+  PageHeader, Pagination,
 } from '@/components/ui';
 import { ReceiptUpload } from '@/components/receipt-upload';
 import { Check, X, Eye, Trash2, Pencil } from 'lucide-react';
@@ -39,7 +39,10 @@ const REJECTION_OPTIONS = REJECTION_REASONS.map((r) => ({ value: r, label: r }))
 
 export default function AdminInvoicesPage() {
   const [statusFilter, setStatusFilter] = useState('');
-  const { data: invoices = [], isLoading } = useGetInvoicesQuery({ status: statusFilter || undefined });
+  const [page, setPage] = useState(1);
+  const { data: result, isLoading } = useGetInvoicesQuery({ status: statusFilter || undefined, page });
+  const invoices = result?.data ?? [];
+  const total = result?.total ?? 0;
   const { data: vendors = [] } = useGetActiveVendorsQuery();
   const [approve]     = useApproveInvoiceMutation();
   const [reject]      = useRejectInvoiceMutation();
@@ -128,7 +131,7 @@ export default function AdminInvoicesPage() {
         action={
           <NativeSelect
             value={statusFilter}
-            onChange={setStatusFilter}
+            onChange={(val) => { setStatusFilter(val); setPage(1); }}
             options={STATUS_OPTIONS}
             placeholder="All statuses"
           />
@@ -201,6 +204,7 @@ export default function AdminInvoicesPage() {
           </TBody>
         </Table>
       )}
+      <Pagination page={page} total={total} limit={20} onChange={setPage} />
 
       <InvoiceDetailModal invoice={viewTarget} onClose={() => setViewTarget(null)} />
 

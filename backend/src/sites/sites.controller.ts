@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { SitesService } from './sites.service';
@@ -29,8 +30,8 @@ export class SitesController {
 
   // All roles — list all sites
   @Get()
-  findAll() {
-    return this.sitesService.findAll();
+  findAll(@Query('page') page?: string, @Query('limit') limit?: string) {
+    return this.sitesService.findAll(Number(page) || 1, Number(limit) || 20);
   }
 
   // All roles — list active sites (used by vendor at invoice creation)

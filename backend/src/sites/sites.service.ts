@@ -10,8 +10,13 @@ export class SitesService {
     return this.prisma.site.create({ data: dto });
   }
 
-  findAll() {
-    return this.prisma.site.findMany({ orderBy: { siteCode: 'asc' } });
+  async findAll(page = 1, limit = 20) {
+    const skip = (page - 1) * limit;
+    const [data, total] = await Promise.all([
+      this.prisma.site.findMany({ orderBy: { siteCode: 'asc' }, skip, take: limit }),
+      this.prisma.site.count(),
+    ]);
+    return { data, total, page, limit };
   }
 
   findActive() {

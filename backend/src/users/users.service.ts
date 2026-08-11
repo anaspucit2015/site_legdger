@@ -19,11 +19,18 @@ export class UsersService {
     return user;
   }
 
-  async findAll() {
-    return this.prisma.user.findMany({
-      select: { id: true, name: true, email: true, role: true, isActive: true, createdAt: true },
-      orderBy: { createdAt: 'desc' },
-    });
+  async findAll(page = 1, limit = 20) {
+    const skip = (page - 1) * limit;
+    const [data, total] = await Promise.all([
+      this.prisma.user.findMany({
+        select: { id: true, name: true, email: true, role: true, isActive: true, createdAt: true },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.user.count(),
+    ]);
+    return { data, total, page, limit };
   }
 
   async findOne(id: string) {

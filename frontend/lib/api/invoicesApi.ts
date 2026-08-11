@@ -1,5 +1,7 @@
 import { baseApi } from './baseApi';
 
+export type PaginatedResult<T> = { data: T[]; total: number; page: number; limit: number; };
+
 export type Invoice = {
   id: string;
   invoiceNumber: number;
@@ -31,13 +33,15 @@ export type Invoice = {
 
 export const invoicesApi = baseApi.injectEndpoints({
   endpoints: (build) => ({
-    getInvoices: build.query<Invoice[], { siteId?: string; vendorId?: string; status?: string; mine?: boolean }>({
+    getInvoices: build.query<PaginatedResult<Invoice>, { siteId?: string; vendorId?: string; status?: string; mine?: boolean; page?: number; limit?: number }>({
       query: (params) => {
         const qs = new URLSearchParams();
         if (params.siteId) qs.set('siteId', params.siteId);
         if (params.vendorId) qs.set('vendorId', params.vendorId);
         if (params.status) qs.set('status', params.status);
         if (params.mine) qs.set('mine', 'true');
+        if (params.page) qs.set('page', String(params.page));
+        if (params.limit) qs.set('limit', String(params.limit));
         return `/invoices?${qs}`;
       },
       providesTags: ['Invoice'],
@@ -66,8 +70,14 @@ export const invoicesApi = baseApi.injectEndpoints({
       query: ({ id, ...body }) => ({ url: `/invoices/${id}/reject`, method: 'POST', body }),
       invalidatesTags: ['Invoice'],
     }),
-    getDeleteRequests: build.query<Invoice[], void>({
-      query: () => '/invoices/delete-requests',
+    getDeleteRequests: build.query<PaginatedResult<Invoice>, { page?: number; limit?: number } | void>({
+      query: (params) => {
+        const qs = new URLSearchParams();
+        if (params?.page) qs.set('page', String(params.page));
+        if (params?.limit) qs.set('limit', String(params.limit));
+        const str = qs.toString();
+        return str ? `/invoices/delete-requests?${str}` : '/invoices/delete-requests';
+      },
       providesTags: ['Invoice'],
     }),
     resolveDeleteRequest: build.mutation<any, { id: string; approve: boolean }>({

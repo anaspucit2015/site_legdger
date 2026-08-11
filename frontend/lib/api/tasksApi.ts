@@ -1,4 +1,5 @@
 import { baseApi } from './baseApi';
+import { PaginatedResult } from './invoicesApi';
 
 export type Task = {
   id: string;
@@ -23,9 +24,18 @@ export type RateHistory = {
 
 export const tasksApi = baseApi.injectEndpoints({
   endpoints: (build) => ({
-    getTasks: build.query<Task[], { active?: boolean } | void>({
-      query: (params) =>
-        params?.active ? '/tasks?active=true' : '/tasks',
+    getTasks: build.query<PaginatedResult<Task>, { page?: number; limit?: number } | void>({
+      query: (params) => {
+        const qs = new URLSearchParams();
+        if (params?.page) qs.set('page', String(params.page));
+        if (params?.limit) qs.set('limit', String(params.limit));
+        const str = qs.toString();
+        return str ? `/tasks?${str}` : '/tasks';
+      },
+      providesTags: ['Task'],
+    }),
+    getActiveTasks: build.query<Task[], void>({
+      query: () => '/tasks?active=true',
       providesTags: ['Task'],
     }),
     getTask: build.query<Task, string>({
@@ -53,6 +63,7 @@ export const tasksApi = baseApi.injectEndpoints({
 
 export const {
   useGetTasksQuery,
+  useGetActiveTasksQuery,
   useGetTaskQuery,
   useCreateTaskMutation,
   useUpdateTaskMutation,

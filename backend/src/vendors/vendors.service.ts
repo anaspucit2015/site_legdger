@@ -10,8 +10,13 @@ export class VendorsService {
     return this.prisma.vendor.create({ data: dto });
   }
 
-  findAll() {
-    return this.prisma.vendor.findMany({ orderBy: { name: 'asc' } });
+  async findAll(page = 1, limit = 20) {
+    const skip = (page - 1) * limit;
+    const [data, total] = await Promise.all([
+      this.prisma.vendor.findMany({ orderBy: { name: 'asc' }, skip, take: limit }),
+      this.prisma.vendor.count(),
+    ]);
+    return { data, total, page, limit };
   }
 
   findActive() {

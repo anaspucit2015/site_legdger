@@ -5,7 +5,7 @@ import { getUser } from '@/lib/auth';
 import {
   Button, Input, Select, Modal,
   Table, THead, TBody, Th, Tr, Td, TableLoading,
-  PageHeader,
+  PageHeader, Pagination,
 } from '@/components/ui';
 import { Plus } from 'lucide-react';
 
@@ -22,7 +22,10 @@ const ROLE_OPTIONS = [
 ];
 
 export default function AdminUsersPage() {
-  const { data: users = [], isLoading } = useGetUsersQuery();
+  const [page, setPage] = useState(1);
+  const { data: result, isLoading } = useGetUsersQuery({ page });
+  const users = result?.data ?? [];
+  const total = result?.total ?? 0;
   const [createUser, { isLoading: creating }] = useCreateUserMutation();
   const [deactivate] = useDeactivateUserMutation();
   const [showForm, setShowForm] = useState(false);
@@ -104,6 +107,7 @@ export default function AdminUsersPage() {
           </TBody>
         </Table>
       )}
+      <Pagination page={page} total={total} limit={20} onChange={setPage} />
 
       <Modal open={showForm} onClose={() => setShowForm(false)} title="Add User">
         <form onSubmit={handleCreate} className="space-y-3">

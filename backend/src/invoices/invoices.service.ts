@@ -82,18 +82,30 @@ export class InvoicesService {
   // ─── Read ──────────────────────────────────────────────────────────────────
 
   // All invoices, filterable — excludes delete-requested (those are in their own queue)
-  findAll(filters: { siteId?: string; vendorId?: string; submittedById?: string; status?: string }) {
-    return this.prisma.invoice.findMany({
-      where: {
-        deleteRequested: false,
-        ...(filters.siteId       && { siteId:       filters.siteId }),
-        ...(filters.vendorId     && { vendorId:     filters.vendorId }),
-        ...(filters.submittedById && { submittedById: filters.submittedById }),
-        ...(filters.status       && { status:       filters.status as any }),
-      },
-      include: { task: true, site: true, vendor: { select: { name: true } }, submittedBy: { select: { name: true } } },
-      orderBy: { submittedAt: 'desc' },
-    });
+  async findAll(
+    filters: { siteId?: string; vendorId?: string; submittedById?: string; status?: string },
+    page = 1,
+    limit = 20,
+  ) {
+    const skip = (page - 1) * limit;
+    const where = {
+      deleteRequested: false,
+      ...(filters.siteId        && { siteId:        filters.siteId }),
+      ...(filters.vendorId      && { vendorId:      filters.vendorId }),
+      ...(filters.submittedById && { submittedById: filters.submittedById }),
+      ...(filters.status        && { status:        filters.status as any }),
+    };
+    const [data, total] = await Promise.all([
+      this.prisma.invoice.findMany({
+        where,
+        include: { task: true, site: true, vendor: { select: { name: true } }, submittedBy: { select: { name: true } } },
+        orderBy: { submittedAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.invoice.count({ where }),
+    ]);
+    return { data, total, page, limit };
   }
 
   async findOne(id: string) {
@@ -225,12 +237,20 @@ export class InvoicesService {
 
   // ─── Admin: Pending Delete Requests ───────────────────────────────────────
 
-  findPendingDeleteRequests() {
-    return this.prisma.invoice.findMany({
-      where: { deleteRequested: true, deleteApprovedBy: null },
-      include: { task: true, site: true, vendor: { select: { name: true } }, submittedBy: { select: { name: true } } },
-      orderBy: { deleteRequestedAt: 'asc' },
-    });
+  async findPendingDeleteRequests(page = 1, limit = 20) {
+    const skip = (page - 1) * limit;
+    const where = { deleteRequested: true, deleteApprovedBy: null };
+    const [data, total] = await Promise.all([
+      this.prisma.invoice.findMany({
+        where,
+        include: { task: true, site: true, vendor: { select: { name: true } }, submittedBy: { select: { name: true } } },
+        orderBy: { deleteRequestedAt: 'asc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.invoice.count({ where }),
+    ]);
+    return { data, total, page, limit };
   }
 
   // ─── Accountant: Release Payment ──────────────────────────────────────────

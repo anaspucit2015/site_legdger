@@ -1,4 +1,5 @@
 import { baseApi } from './baseApi';
+import { PaginatedResult } from './invoicesApi';
 
 export type Site = {
   id: string;
@@ -11,8 +12,14 @@ export type Site = {
 
 export const sitesApi = baseApi.injectEndpoints({
   endpoints: (build) => ({
-    getSites: build.query<Site[], void>({
-      query: () => '/sites',
+    getSites: build.query<PaginatedResult<Site>, { page?: number; limit?: number } | void>({
+      query: (params) => {
+        const qs = new URLSearchParams();
+        if (params?.page) qs.set('page', String(params.page));
+        if (params?.limit) qs.set('limit', String(params.limit));
+        const str = qs.toString();
+        return str ? `/sites?${str}` : '/sites';
+      },
       providesTags: ['Site'],
     }),
     getActiveSites: build.query<Site[], void>({

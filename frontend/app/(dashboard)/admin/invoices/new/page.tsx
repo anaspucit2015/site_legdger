@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useGetActiveSitesQuery } from '@/lib/api/sitesApi';
-import { useGetTasksQuery } from '@/lib/api/tasksApi';
+import { useGetActiveTasksQuery } from '@/lib/api/tasksApi';
 import { useGetActiveVendorsQuery } from '@/lib/api/vendorsApi';
 import { useCreateInvoiceMutation } from '@/lib/api/invoicesApi';
 import {
@@ -14,7 +14,7 @@ import { ReceiptUpload } from '@/components/receipt-upload';
 export default function AdminNewInvoicePage() {
   const router = useRouter();
   const { data: sites = [] } = useGetActiveSitesQuery();
-  const { data: tasks = [] } = useGetTasksQuery({ active: true });
+  const { data: tasks = [] } = useGetActiveTasksQuery();
   const { data: vendors = [] } = useGetActiveVendorsQuery();
 
   const [siteId, setSiteId] = useState('');

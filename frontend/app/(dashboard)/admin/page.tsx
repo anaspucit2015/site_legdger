@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useGetInvoicesQuery, useGetDeleteRequestsQuery } from '@/lib/api/invoicesApi';
 import { useGetSitesQuery } from '@/lib/api/sitesApi';
 import { useGetUsersQuery } from '@/lib/api/usersApi';
-import { useGetTasksQuery } from '@/lib/api/tasksApi';
+import { useGetActiveTasksQuery } from '@/lib/api/tasksApi';
 import { StatusStamp } from '@/components/status-stamp';
 import { TableLoading } from '@/components/ui';
 import { getUser } from '@/lib/auth';
@@ -57,12 +57,18 @@ function StatCard({
 
 export default function AdminDashboard() {
   const user = getUser();
-  const { data: pendingInvoices = [], isLoading: loadingPending } = useGetInvoicesQuery({ status: 'pending' });
-  const { data: approvedInvoices = [] } = useGetInvoicesQuery({ status: 'approved' });
-  const { data: sites = [] } = useGetSitesQuery();
-  const { data: users = [] } = useGetUsersQuery();
-  const { data: tasks = [] } = useGetTasksQuery();
-  const { data: deleteRequests = [] } = useGetDeleteRequestsQuery();
+  const { data: pendingResult,  isLoading: loadingPending } = useGetInvoicesQuery({ status: 'pending' });
+  const { data: approvedResult } = useGetInvoicesQuery({ status: 'approved' });
+  const { data: sitesResult }    = useGetSitesQuery();
+  const { data: usersResult }    = useGetUsersQuery();
+  const { data: tasks = [] }     = useGetActiveTasksQuery();
+  const { data: deleteResult }   = useGetDeleteRequestsQuery();
+
+  const pendingInvoices  = pendingResult?.data  ?? [];
+  const approvedInvoices = approvedResult?.data ?? [];
+  const sites            = sitesResult?.data    ?? [];
+  const users            = usersResult?.data    ?? [];
+  const deleteRequests   = deleteResult?.data   ?? [];
 
   const pendingAmount  = pendingInvoices.reduce((s, i) => s + Number(i.amount), 0);
   const approvedAmount = approvedInvoices.reduce((s, i) => s + Number(i.amount), 0);

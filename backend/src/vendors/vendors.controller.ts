@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { VendorsService } from './vendors.service';
 import { CreateVendorDto, UpdateVendorDto } from './vendors.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -18,8 +18,8 @@ export class VendorsController {
   }
 
   @Get()
-  findAll() {
-    return this.vendorsService.findAll();
+  findAll(@Query('page') page?: string, @Query('limit') limit?: string) {
+    return this.vendorsService.findAll(Number(page) || 1, Number(limit) || 20);
   }
 
   @Get('active')

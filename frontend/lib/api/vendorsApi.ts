@@ -1,4 +1,5 @@
 import { baseApi } from './baseApi';
+import { PaginatedResult } from './invoicesApi';
 
 export type Vendor = {
   id: string;
@@ -13,8 +14,14 @@ export type Vendor = {
 
 export const vendorsApi = baseApi.injectEndpoints({
   endpoints: (build) => ({
-    getVendors: build.query<Vendor[], void>({
-      query: () => '/vendors',
+    getVendors: build.query<PaginatedResult<Vendor>, { page?: number; limit?: number } | void>({
+      query: (params) => {
+        const qs = new URLSearchParams();
+        if (params?.page) qs.set('page', String(params.page));
+        if (params?.limit) qs.set('limit', String(params.limit));
+        const str = qs.toString();
+        return str ? `/vendors?${str}` : '/vendors';
+      },
       providesTags: ['Vendor'],
     }),
     getActiveVendors: build.query<Vendor[], void>({

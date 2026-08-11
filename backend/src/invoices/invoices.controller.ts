@@ -42,29 +42,36 @@ export class InvoicesController {
     @Query('vendorId') vendorId?: string,
     @Query('status') status?: string,
     @Query('mine') mine?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
     const { role } = req.user;
+    const p = Number(page) || 1;
+    const l = Number(limit) || 20;
 
     // mine=true → own submissions only, works for all roles
     if (mine === 'true') {
-      return this.invoicesService.findAll({ submittedById: req.user.id, siteId, status });
+      return this.invoicesService.findAll({ submittedById: req.user.id, siteId, status }, p, l);
     }
 
     if (role === 'admin' || role === 'accountant') {
-      return this.invoicesService.findAll({ siteId, vendorId, status });
+      return this.invoicesService.findAll({ siteId, vendorId, status }, p, l);
     }
 
     // site_supervisor: no siteId → own invoices; with siteId → all invoices for that site (Site Invoices page)
-    if (!siteId) return this.invoicesService.findAll({ submittedById: req.user.id, status });
-    return this.invoicesService.findAll({ siteId, status });
+    if (!siteId) return this.invoicesService.findAll({ submittedById: req.user.id, status }, p, l);
+    return this.invoicesService.findAll({ siteId, status }, p, l);
   }
 
   // ─── Admin: pending delete requests queue ─────────────────────────────────
   @UseGuards(RolesGuard)
   @Roles('admin')
   @Get('delete-requests')
-  findPendingDeleteRequests() {
-    return this.invoicesService.findPendingDeleteRequests();
+  findPendingDeleteRequests(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.invoicesService.findPendingDeleteRequests(Number(page) || 1, Number(limit) || 20);
   }
 
   // ─── Single invoice ────────────────────────────────────────────────────────

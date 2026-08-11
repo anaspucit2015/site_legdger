@@ -6,6 +6,7 @@ import {
   Patch,
   Post,
   Delete,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
@@ -28,8 +29,8 @@ export class UsersController {
 
   @Roles('admin', 'accountant')
   @Get()
-  findAll() {
-    return this.usersService.findAll();
+  findAll(@Query('page') page?: string, @Query('limit') limit?: string) {
+    return this.usersService.findAll(Number(page) || 1, Number(limit) || 20);
   }
 
   @Roles('admin', 'accountant')

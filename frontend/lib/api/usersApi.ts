@@ -1,4 +1,5 @@
 import { baseApi } from './baseApi';
+import { PaginatedResult } from './invoicesApi';
 
 export type User = {
   id: string;
@@ -11,8 +12,14 @@ export type User = {
 
 export const usersApi = baseApi.injectEndpoints({
   endpoints: (build) => ({
-    getUsers: build.query<User[], void>({
-      query: () => '/users',
+    getUsers: build.query<PaginatedResult<User>, { page?: number; limit?: number } | void>({
+      query: (params) => {
+        const qs = new URLSearchParams();
+        if (params?.page) qs.set('page', String(params.page));
+        if (params?.limit) qs.set('limit', String(params.limit));
+        const str = qs.toString();
+        return str ? `/users?${str}` : '/users';
+      },
       providesTags: ['User'],
     }),
     createUser: build.mutation<User, { name: string; email: string; password: string; role: string }>({
