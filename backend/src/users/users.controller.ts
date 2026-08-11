@@ -20,21 +20,25 @@ import { Roles } from '../common/decorators/roles.decorator';
 export class UsersController {
   constructor(private usersService: UsersService) {}
 
+  @Roles('admin', 'accountant')
   @Post()
   create(@Body() dto: CreateUserDto) {
     return this.usersService.create(dto);
   }
 
+  @Roles('admin', 'accountant')
   @Get()
   findAll() {
     return this.usersService.findAll();
   }
 
+  @Roles('admin', 'accountant')
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.usersService.findOne(id);
   }
 
+  @Roles('admin', 'accountant')
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: UpdateUserDto) {
     return this.usersService.update(id, dto);

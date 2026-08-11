@@ -19,7 +19,7 @@ export class InvoicesService {
 
   // ─── Create ────────────────────────────────────────────────────────────────
 
-  async create(dto: CreateInvoiceDto, vendorId: string, role?: string) {
+  async create(dto: CreateInvoiceDto, submittedById: string, role?: string) {
     let amount: Decimal;
     let unitCostSnapshot: Decimal | null = null;
     let unit: string;
@@ -35,7 +35,7 @@ export class InvoicesService {
       taskId = task.id;
 
       if (task.isCustom && !task.unitCost) {
-        // Admin-created custom task with no rate: vendor provides total amount
+        // Admin-created custom task with no rate: submitter provides total amount
         if (!dto.amount) throw new BadRequestException('amount is required for custom tasks');
         amount = new Decimal(dto.amount);
       } else {
@@ -44,7 +44,7 @@ export class InvoicesService {
         amount = task.unitCost.mul(new Decimal(dto.quantity));
       }
     } else {
-      // Vendor custom task: stored directly on invoice, no Task record created
+      // Custom task: stored directly on invoice, no Task record created
       if (!dto.customTaskName || !dto.customTaskUnit || !dto.customTaskUnitCost) {
         throw new BadRequestException(
           'customTaskName, customTaskUnit, and customTaskUnitCost are required when taskId is not provided',
@@ -63,7 +63,8 @@ export class InvoicesService {
         taskId,
         customTaskName: dto.taskId ? null : (dto.customTaskName ?? null),
         siteId: dto.siteId,
-        vendorId,
+        submittedById,
+        vendorId: dto.vendorId,
         unit,
         quantity: dto.quantity,
         unitCostSnapshot,
@@ -71,65 +72,44 @@ export class InvoicesService {
         description: dto.description ?? null,
         attachmentUrl: dto.attachmentUrl ?? null,
         status,
-        ...(status === 'approved' && { approvedBy: vendorId, approvedAt: now }),
-        ...(status === 'paid' && { approvedBy: vendorId, approvedAt: now, paidBy: vendorId, paidAt: now }),
+        ...(status === 'approved' && { approvedBy: submittedById, approvedAt: now }),
+        ...(status === 'paid' && { approvedBy: submittedById, approvedAt: now, paidBy: submittedById, paidAt: now }),
       },
-      include: { task: true, site: true, vendor: { select: { name: true } } },
+      include: { task: true, site: true, vendor: { select: { name: true } }, submittedBy: { select: { name: true } } },
     });
   }
 
   // ─── Read ──────────────────────────────────────────────────────────────────
 
-  // Admin: all invoices, filterable — excludes delete-requested (those are in their own queue)
-  findAll(filters: { siteId?: string; vendorId?: string; status?: string }) {
+  // All invoices, filterable — excludes delete-requested (those are in their own queue)
+  findAll(filters: { siteId?: string; vendorId?: string; submittedById?: string; status?: string }) {
     return this.prisma.invoice.findMany({
       where: {
         deleteRequested: false,
-        ...(filters.siteId && { siteId: filters.siteId }),
-        ...(filters.vendorId && { vendorId: filters.vendorId }),
-        ...(filters.status && { status: filters.status as any }),
+        ...(filters.siteId       && { siteId:       filters.siteId }),
+        ...(filters.vendorId     && { vendorId:     filters.vendorId }),
+        ...(filters.submittedById && { submittedById: filters.submittedById }),
+        ...(filters.status       && { status:       filters.status as any }),
       },
-      include: { task: true, site: true, vendor: { select: { name: true } } },
+      include: { task: true, site: true, vendor: { select: { name: true } }, submittedBy: { select: { name: true } } },
       orderBy: { submittedAt: 'desc' },
-    });
-  }
-
-  // Vendor: all invoices within a site (site-scoped, not vendor-scoped)
-  findBySite(siteId: string) {
-    return this.prisma.invoice.findMany({
-      where: { siteId },
-      include: { task: true, site: true, vendor: { select: { name: true } } },
-      orderBy: { submittedAt: 'desc' },
-    });
-  }
-
-  // Accountant: approved + paid invoices only
-  findForAccountant(filters: { siteId?: string; status?: string }) {
-    return this.prisma.invoice.findMany({
-      where: {
-        status: { in: ['approved', 'paid'] },
-        ...(filters.siteId && { siteId: filters.siteId }),
-        ...(filters.status && { status: filters.status as any }),
-      },
-      include: { task: true, site: true, vendor: { select: { name: true } } },
-      orderBy: { approvedAt: 'desc' },
     });
   }
 
   async findOne(id: string) {
     const invoice = await this.prisma.invoice.findUnique({
       where: { id },
-      include: { task: true, site: true, vendor: { select: { name: true } } },
+      include: { task: true, site: true, vendor: { select: { name: true } }, submittedBy: { select: { name: true } } },
     });
     if (!invoice) throw new NotFoundException('Invoice not found');
     return invoice;
   }
 
-  // ─── Vendor: Edit (pending only) ──────────────────────────────────────────
+  // ─── Site Supervisor: Edit (pending only) ────────────────────────────────
 
-  async update(id: string, dto: UpdateInvoiceDto, vendorId: string) {
+  async update(id: string, dto: UpdateInvoiceDto, submittedById: string, role?: string) {
     const invoice = await this.findOne(id);
-    if (invoice.vendorId !== vendorId)
+    if (role !== 'admin' && invoice.submittedById !== submittedById)
       throw new ForbiddenException('Not your invoice');
     if (invoice.status !== 'pending')
       throw new BadRequestException('Only pending invoices can be edited');
@@ -145,21 +125,22 @@ export class InvoicesService {
     return this.prisma.invoice.update({
       where: { id },
       data: {
-        ...(dto.quantity && { quantity: dto.quantity }),
+        ...(dto.vendorId    && { vendorId: dto.vendorId }),
+        ...(dto.quantity    && { quantity: dto.quantity }),
         amount,
-        ...(dto.description !== undefined && { description: dto.description }),
+        ...(dto.description  !== undefined && { description:   dto.description }),
         ...(dto.attachmentUrl !== undefined && { attachmentUrl: dto.attachmentUrl }),
         syncVersion: { increment: 1 },
       },
-      include: { task: true, site: true, vendor: { select: { name: true } } },
+      include: { task: true, site: true, vendor: { select: { name: true } }, submittedBy: { select: { name: true } } },
     });
   }
 
-  // ─── Vendor: Delete Request (pending only) ────────────────────────────────
+  // ─── Site Supervisor / Accountant: Delete Request (pending only) ─────────
 
-  async requestDelete(id: string, vendorId: string) {
+  async requestDelete(id: string, submittedById: string) {
     const invoice = await this.findOne(id);
-    if (invoice.vendorId !== vendorId)
+    if (invoice.submittedById !== submittedById)
       throw new ForbiddenException('Not your invoice');
     if (invoice.status !== 'pending')
       throw new BadRequestException('Only pending invoices can be delete-requested');
@@ -170,10 +151,20 @@ export class InvoicesService {
       where: { id },
       data: {
         deleteRequested: true,
-        deleteRequestedBy: vendorId,
+        deleteRequestedBy: submittedById,
         deleteRequestedAt: new Date(),
       },
     });
+  }
+
+  // ─── Admin: Direct Delete (pending / approved) ───────────────────────────
+
+  async adminDelete(id: string) {
+    const invoice = await this.findOne(id);
+    if (!['pending', 'approved'].includes(invoice.status))
+      throw new BadRequestException('Only pending or approved invoices can be deleted');
+    await this.prisma.invoice.delete({ where: { id } });
+    return { deleted: true };
   }
 
   // ─── Admin: Approve ───────────────────────────────────────────────────────
@@ -237,7 +228,7 @@ export class InvoicesService {
   findPendingDeleteRequests() {
     return this.prisma.invoice.findMany({
       where: { deleteRequested: true, deleteApprovedBy: null },
-      include: { task: true, site: true, vendor: { select: { name: true } } },
+      include: { task: true, site: true, vendor: { select: { name: true } }, submittedBy: { select: { name: true } } },
       orderBy: { deleteRequestedAt: 'asc' },
     });
   }

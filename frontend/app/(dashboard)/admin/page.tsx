@@ -67,7 +67,7 @@ export default function AdminDashboard() {
   const pendingAmount  = pendingInvoices.reduce((s, i) => s + Number(i.amount), 0);
   const approvedAmount = approvedInvoices.reduce((s, i) => s + Number(i.amount), 0);
   const activeSites    = sites.filter((s) => s.isActive).length;
-  const activeVendors  = users.filter((u) => u.role === 'vendor' && u.isActive).length;
+  const activeVendors  = users.filter((u) => u.role === 'site_supervisor' && u.isActive).length;
   const activeAccts    = users.filter((u) => u.role === 'accountant' && u.isActive).length;
 
   const hour = new Date().getHours();
@@ -115,7 +115,7 @@ export default function AdminDashboard() {
           href="/admin/sites"
         />
         <StatCard
-          label="Vendors"
+          label="Site Supervisors"
           value={activeVendors}
           sub={`${activeAccts} accountant${activeAccts !== 1 ? 's' : ''}`}
           icon={Users}

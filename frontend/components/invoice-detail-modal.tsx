@@ -69,7 +69,7 @@ export function InvoiceDetailModal({ invoice: inv, onClose }: Props) {
     <Modal
       open={!!inv}
       onClose={onClose}
-      title="Invoice Details"
+      title={`INV-${String(inv.invoiceNumber).padStart(5, '0')}`}
       subtitle={`${inv.site?.name ?? '—'} · ${inv.task?.name ?? inv.customTaskName ?? '—'}`}
       maxWidth={640}
     >
@@ -95,7 +95,8 @@ export function InvoiceDetailModal({ invoice: inv, onClose }: Props) {
         {inv.unitCostSnapshot && (
           <Row label="Rate"     value={`Rs. ${Number(inv.unitCostSnapshot).toLocaleString()} / ${inv.unit}`} mono />
         )}
-        <Row label="Vendor" value={inv.vendor?.name ?? inv.vendorId.slice(-12)} />
+        {inv.vendor && <Row label="Vendor"       value={inv.vendor.name} />}
+        {inv.submittedBy && <Row label="Submitted By" value={inv.submittedBy.name} />}
         <Row label="Submitted"  value={new Date(inv.submittedAt).toLocaleDateString('en-PK', { day: 'numeric', month: 'short', year: 'numeric' })} />
         {isPaid && inv.paymentRef && (
           <Row label="Payment Ref" value={inv.paymentRef} mono />

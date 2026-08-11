@@ -7,8 +7,8 @@ export class ReportsService {
   constructor(private prisma: PrismaService) {}
 
   async getVendors() {
-    return this.prisma.user.findMany({
-      where: { role: 'vendor', isActive: true },
+    return this.prisma.vendor.findMany({
+      where: { isActive: true },
       select: { id: true, name: true },
       orderBy: { name: 'asc' },
     });
@@ -48,8 +48,8 @@ export class ReportsService {
     }
 
     // Fetch vendor names for all invoices in one query
-    const vendorIds = [...new Set(invoices.map((i) => i.vendorId))];
-    const vendors = await this.prisma.user.findMany({
+    const vendorIds = [...new Set(invoices.map((i) => i.vendorId).filter(Boolean))] as string[];
+    const vendors = await this.prisma.vendor.findMany({
       where: { id: { in: vendorIds } },
       select: { id: true, name: true },
     });
@@ -78,7 +78,7 @@ export class ReportsService {
     sheet.columns = [
       { header: 'Invoice ID',      key: 'id',          width: 22 },
       { header: 'Site',            key: 'site',         width: 22 },
-      { header: 'Vendor',          key: 'vendor',       width: 22 },
+      { header: 'Vendor',           key: 'vendor',       width: 22 },
       { header: 'Task',            key: 'task',         width: 26 },
       { header: 'Unit',            key: 'unit',         width: 10 },
       { header: 'Quantity',        key: 'quantity',     width: 12 },
@@ -116,7 +116,7 @@ export class ReportsService {
       const row = sheet.addRow({
         id:          inv.id,
         site:        inv.site?.name ?? '—',
-        vendor:      vendorMap[inv.vendorId] ?? inv.vendorId,
+        vendor:      inv.vendorId ? (vendorMap[inv.vendorId] ?? inv.vendorId) : '—',
         task:        inv.task?.name ?? inv.customTaskName ?? '—',
         unit:        inv.unit,
         quantity:    Number(inv.quantity),

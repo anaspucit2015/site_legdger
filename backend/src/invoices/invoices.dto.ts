@@ -4,6 +4,9 @@ export class CreateInvoiceDto {
   @IsString()
   siteId: string;
 
+  @IsString()
+  vendorId: string;
+
   // Either taskId OR all three customTask* fields must be provided
   @IsOptional()
   @IsString()
@@ -44,6 +47,10 @@ export class CreateInvoiceDto {
 }
 
 export class UpdateInvoiceDto {
+  @IsOptional()
+  @IsString()
+  vendorId?: string;
+
   @IsOptional()
   @IsDecimal()
   quantity?: string;

@@ -1,6 +1,7 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useGetUsersQuery, useCreateUserMutation, useDeactivateUserMutation } from '@/lib/api/usersApi';
+import { getUser } from '@/lib/auth';
 import {
   Button, Input, Select, Modal,
   Table, THead, TBody, Th, Tr, Td, TableLoading,
@@ -9,13 +10,13 @@ import {
 import { Plus } from 'lucide-react';
 
 const roleColors: Record<string, { bg: string; color: string }> = {
-  admin:      { bg: '#eef0fb', color: '#3b47b5' },
-  vendor:     { bg: '#fff8ec', color: '#b87a10' },
-  accountant: { bg: '#edf7f2', color: '#1e6e49' },
+  admin:           { bg: '#eef0fb', color: '#3b47b5' },
+  site_supervisor: { bg: '#fff8ec', color: '#b87a10' },
+  accountant:      { bg: '#edf7f2', color: '#1e6e49' },
 };
 
 const ROLE_OPTIONS = [
-  { value: 'vendor', label: 'Vendor' },
+  { value: 'site_supervisor', label: 'Site Supervisor' },
   { value: 'accountant', label: 'Accountant' },
   { value: 'admin', label: 'Admin' },
 ];
@@ -25,7 +26,12 @@ export default function AdminUsersPage() {
   const [createUser, { isLoading: creating }] = useCreateUserMutation();
   const [deactivate] = useDeactivateUserMutation();
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'vendor' });
+  const [currentRole, setCurrentRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    setCurrentRole(getUser()?.role ?? null);
+  }, []);
+  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'site_supervisor' });
   const [error, setError] = useState('');
 
   async function handleCreate(e: React.FormEvent) {
@@ -33,7 +39,7 @@ export default function AdminUsersPage() {
     setError('');
     try {
       await createUser(form).unwrap();
-      setForm({ name: '', email: '', password: '', role: 'vendor' });
+      setForm({ name: '', email: '', password: '', role: 'site_supervisor' });
       setShowForm(false);
     } catch (err: any) {
       setError(err?.data?.message ?? 'Failed to create user');
@@ -87,7 +93,7 @@ export default function AdminUsersPage() {
                   </span>
                 </Td>
                 <Td right>
-                  {u.isActive && (
+                  {u.isActive && currentRole === 'admin' && (
                     <Button size="sm" variant="ghost" onClick={() => deactivate(u.id)} style={{ color: 'var(--rust)' }}>
                       Deactivate
                     </Button>

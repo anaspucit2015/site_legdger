@@ -2,8 +2,8 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
-export default function VendorRoot() {
+export default function SiteSupervisorRoot() {
   const router = useRouter();
-  useEffect(() => { router.replace('/vendor/my-invoices'); }, [router]);
+  useEffect(() => { router.replace('/site-supervisor/my-invoices'); }, [router]);
   return null;
 }

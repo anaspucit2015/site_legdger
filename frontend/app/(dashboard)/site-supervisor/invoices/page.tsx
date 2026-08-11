@@ -18,7 +18,7 @@ const STATUS_OPTIONS = [
   { value: 'paid',     label: 'Paid'     },
 ];
 
-export default function VendorInvoicesPage() {
+export default function SiteSupervisorInvoicesPage() {
   const { data: sites = [] } = useGetActiveSitesQuery();
   const [selectedSite, setSelectedSite]     = useState('');
   const [statusFilter, setStatusFilter]     = useState('');
@@ -34,7 +34,7 @@ export default function VendorInvoicesPage() {
     <div>
       <PageHeader
         title="Site Invoices"
-        subtitle="All invoices submitted on this site — across all vendors"
+        subtitle="All invoices submitted on this site — across all supervisors"
         action={
           <div className="flex gap-2">
             <NativeSelect
@@ -63,9 +63,11 @@ export default function VendorInvoicesPage() {
         <Table>
           <THead>
             <tr>
+              <Th>#</Th>
               <Th>Task</Th>
               <Th>Vendor</Th>
-              <Th>Quantity</Th>
+              <Th>Qty</Th>
+              <Th>Unit Price</Th>
               <Th>Amount (PKR)</Th>
               <Th>Status</Th>
               <Th>Submitted</Th>
@@ -75,9 +77,11 @@ export default function VendorInvoicesPage() {
           <TBody>
             {invoices.map((inv) => (
               <Tr key={inv.id}>
+                <Td mono muted>{`INV-${String(inv.invoiceNumber).padStart(5, '0')}`}</Td>
                 <Td bold>{inv.task?.name ?? inv.customTaskName ?? '—'}</Td>
                 <Td muted>{inv.vendor?.name ?? '—'}</Td>
-                <Td mono muted>{inv.quantity} {inv.unit}</Td>
+                <Td mono muted>{Number(inv.quantity).toLocaleString()} {inv.unit}</Td>
+                <Td mono muted>{inv.unitCostSnapshot ? `Rs. ${Number(inv.unitCostSnapshot).toLocaleString()}` : '—'}</Td>
                 <Td mono bold>Rs. {Number(inv.amount).toLocaleString()}</Td>
                 <Td>
                   <div>

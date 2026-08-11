@@ -5,7 +5,7 @@ export type AuthUser = {
   id: string;
   name: string;
   email: string;
-  role: 'admin' | 'vendor' | 'accountant';
+  role: 'admin' | 'site_supervisor' | 'accountant';
 };
 
 export function getToken(): string | null {

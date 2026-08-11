@@ -3,6 +3,8 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { getUser, clearAuth } from '@/lib/auth';
+import { store } from '@/lib/store';
+import { baseApi } from '@/lib/api/baseApi';
 import { AuthGuard } from '@/components/auth-guard';
 import { Logo } from '@/components/logo';
 import {
@@ -30,34 +32,39 @@ const navByRole: Record<string, NavEntry[]> = {
     },
     { type: 'link', label: 'Tasks',   href: '/admin/tasks',   icon: ListChecks },
     { type: 'link', label: 'Sites',   href: '/admin/sites',   icon: MapPin },
+    { type: 'link', label: 'Vendors', href: '/admin/vendors', icon: Users },
     { type: 'link', label: 'Users',   href: '/admin/users',   icon: Users },
     { type: 'link', label: 'Reports', href: '/admin/reports', icon: BarChart2 },
   ],
-  vendor: [
+  site_supervisor: [
     {
-      type: 'group', label: 'Invoices', href: '/vendor/my-invoices', icon: FileText,
+      type: 'group', label: 'Invoices', href: '/site-supervisor/my-invoices', icon: FileText,
       children: [
-        { label: 'My Invoices',    href: '/vendor/my-invoices',  icon: ClipboardList },
-        { label: 'Site Invoices',  href: '/vendor/invoices',     icon: FileText },
-        { label: 'Submit Invoice', href: '/vendor/invoices/new', icon: PlusCircle },
+        { label: 'My Invoices',    href: '/site-supervisor/my-invoices',  icon: ClipboardList },
+        { label: 'Site Invoices',  href: '/site-supervisor/invoices',     icon: FileText },
+        { label: 'Submit Invoice', href: '/site-supervisor/invoices/new', icon: PlusCircle },
       ],
     },
   ],
   accountant: [
     {
-      type: 'group', label: 'Invoices', href: '/accountant/invoices', icon: Wallet,
+      type: 'group', label: 'Invoices', href: '/accountant/invoices', icon: FileText,
       children: [
-        { label: 'All Invoices',   href: '/accountant/invoices',     icon: Wallet },
+        { label: 'All Invoices',   href: '/accountant/invoices',     icon: FileText },
         { label: 'My Invoices',    href: '/accountant/my-invoices',  icon: ClipboardList },
         { label: 'Submit Invoice', href: '/accountant/invoices/new', icon: PlusCircle },
       ],
     },
+    { type: 'link', label: 'Tasks',   href: '/admin/tasks',   icon: ListChecks },
+    { type: 'link', label: 'Sites',   href: '/admin/sites',   icon: MapPin },
+    { type: 'link', label: 'Vendors', href: '/admin/vendors', icon: Users },
+    { type: 'link', label: 'Users',   href: '/admin/users',   icon: Users },
     { type: 'link', label: 'Reports', href: '/accountant/reports', icon: BarChart2 },
   ],
 };
 
 const roleLabel: Record<string, string> = {
-  admin: 'Admin', vendor: 'Vendor', accountant: 'Accountant',
+  admin: 'Admin', site_supervisor: 'Site Supervisor', accountant: 'Accountant',
 };
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -208,7 +215,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </div>
             </div>
             <button
-              onClick={() => { clearAuth(); router.replace('/login'); }}
+              onClick={() => { clearAuth(); store.dispatch(baseApi.util.resetApiState()); router.replace('/login'); }}
               className="flex items-center gap-2 px-3 py-2 w-full rounded-lg text-sm transition-all cursor-pointer"
               style={{ color: 'rgba(255,255,255,0.45)', fontFamily: 'var(--font-body)' }}
               onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}
@@ -222,7 +229,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* Main */}
         <main className="flex-1 overflow-y-auto" style={{ background: 'var(--paper)' }}>
-          <div className="p-8 max-w-6xl">{children}</div>
+          <div className="p-8 max-w-7xl">{children}</div>
         </main>
       </div>
     </AuthGuard>

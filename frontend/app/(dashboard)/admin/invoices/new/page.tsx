@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useGetActiveSitesQuery } from '@/lib/api/sitesApi';
 import { useGetTasksQuery } from '@/lib/api/tasksApi';
+import { useGetActiveVendorsQuery } from '@/lib/api/vendorsApi';
 import { useCreateInvoiceMutation } from '@/lib/api/invoicesApi';
 import {
   Button, Input, Textarea, Select,
@@ -14,8 +15,10 @@ export default function AdminNewInvoicePage() {
   const router = useRouter();
   const { data: sites = [] } = useGetActiveSitesQuery();
   const { data: tasks = [] } = useGetTasksQuery({ active: true });
+  const { data: vendors = [] } = useGetActiveVendorsQuery();
 
   const [siteId, setSiteId] = useState('');
+  const [vendorId, setVendorId] = useState('');
   const [taskId, setTaskId] = useState('');
   const [quantity, setQuantity] = useState('');
   const [amount, setAmount] = useState('');
@@ -46,6 +49,7 @@ export default function AdminNewInvoicePage() {
       : null;
 
   const siteOptions = sites.map((s) => ({ value: s.id, label: s.name }));
+  const vendorOptions = vendors.map((v) => ({ value: v.id, label: v.name }));
   const taskOptions = tasks.map((t) => ({
     value: t.id,
     label: `${t.name} · ${t.unit}${t.unitCost ? ` · Rs. ${Number(t.unitCost).toLocaleString()}/unit` : ' (custom amount)'}`,
@@ -68,6 +72,7 @@ export default function AdminNewInvoicePage() {
       if (isCustomMode) {
         await createInvoice({
           siteId,
+          vendorId,
           customTaskName,
           customTaskUnit,
           customTaskUnitCost,
@@ -79,6 +84,7 @@ export default function AdminNewInvoicePage() {
       } else {
         await createInvoice({
           siteId,
+          vendorId,
           taskId,
           quantity,
           status,
@@ -94,8 +100,8 @@ export default function AdminNewInvoicePage() {
   }
 
   const canSubmit = isCustomMode
-    ? !isLoading && !!siteId && !!customTaskName && !!customTaskUnit && !!customTaskUnitCost && !!quantity
-    : !isLoading && !!siteId && !!taskId && !!quantity && (!isLegacyCustom || !!amount);
+    ? !isLoading && !!siteId && !!vendorId && !!customTaskName && !!customTaskUnit && !!customTaskUnitCost && !!quantity
+    : !isLoading && !!siteId && !!vendorId && !!taskId && !!quantity && (!isLegacyCustom || !!amount);
 
   return (
     <div>
@@ -112,6 +118,14 @@ export default function AdminNewInvoicePage() {
             onChange={setSiteId}
             options={siteOptions}
             placeholder="Select site…"
+          />
+
+          <Select
+            label="Vendor"
+            value={vendorId}
+            onChange={setVendorId}
+            options={vendorOptions}
+            placeholder="Select vendor…"
           />
 
           {!isCustomMode && (

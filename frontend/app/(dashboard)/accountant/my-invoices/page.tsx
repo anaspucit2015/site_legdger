@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { useGetInvoicesQuery, Invoice } from '@/lib/api/invoicesApi';
+import { useGetInvoicesQuery, useRequestDeleteInvoiceMutation, Invoice } from '@/lib/api/invoicesApi';
 import { useGetActiveSitesQuery } from '@/lib/api/sitesApi';
 import { StatusStamp } from '@/components/status-stamp';
 import { InvoiceDetailModal } from '@/components/invoice-detail-modal';
@@ -24,6 +24,13 @@ export default function AccountantMyInvoicesPage() {
   const [siteFilter, setSiteFilter]     = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [viewTarget, setViewTarget]     = useState<Invoice | null>(null);
+  const [requestDelete] = useRequestDeleteInvoiceMutation();
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  async function handleRequestDelete(id: string) {
+    setDeletingId(id);
+    try { await requestDelete(id); } finally { setDeletingId(null); }
+  }
 
   const { data: invoices = [], isLoading } = useGetInvoicesQuery({
     mine: true,
@@ -76,8 +83,11 @@ export default function AccountantMyInvoicesPage() {
         <Table>
           <THead>
             <tr>
+              <Th>#</Th>
               <Th>Site / Task</Th>
-              <Th>Quantity</Th>
+              <Th>Vendor</Th>
+              <Th>Qty</Th>
+              <Th>Unit Price</Th>
               <Th>Amount (PKR)</Th>
               <Th>Status</Th>
               <Th>Submitted</Th>
@@ -87,11 +97,14 @@ export default function AccountantMyInvoicesPage() {
           <TBody>
             {invoices.map((inv) => (
               <Tr key={inv.id}>
+                <Td mono muted>{`INV-${String(inv.invoiceNumber).padStart(5, '0')}`}</Td>
                 <Td>
                   <p className="font-medium" style={{ color: 'var(--navy)' }}>{inv.site?.name ?? '—'}</p>
                   <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{inv.task?.name ?? inv.customTaskName ?? '—'}</p>
                 </Td>
-                <Td mono muted>{inv.quantity} {inv.unit}</Td>
+                <Td muted>{inv.vendor?.name ?? '—'}</Td>
+                <Td mono muted>{Number(inv.quantity).toLocaleString()} {inv.unit}</Td>
+                <Td mono muted>{inv.unitCostSnapshot ? `Rs. ${Number(inv.unitCostSnapshot).toLocaleString()}` : '—'}</Td>
                 <Td mono bold>Rs. {Number(inv.amount).toLocaleString()}</Td>
                 <Td>
                   <div>
@@ -103,9 +116,16 @@ export default function AccountantMyInvoicesPage() {
                 </Td>
                 <Td muted>{new Date(inv.submittedAt).toLocaleDateString()}</Td>
                 <Td right>
-                  <Button size="sm" variant="ghost" onClick={() => setViewTarget(inv)}>
-                    <Eye size={13} /> View
-                  </Button>
+                  <div className="flex gap-2 justify-end">
+                    <Button size="sm" variant="ghost" onClick={() => setViewTarget(inv)}>
+                      <Eye size={13} /> View
+                    </Button>
+                    {inv.status === 'pending' && !inv.deleteRequested && (
+                      <Button size="sm" variant="ghost" loading={deletingId === inv.id} disabled={!!deletingId} onClick={() => handleRequestDelete(inv.id)} style={{ color: 'var(--rust)' }}>
+                        Request Delete
+                      </Button>
+                    )}
+                  </div>
                 </Td>
               </Tr>
             ))}

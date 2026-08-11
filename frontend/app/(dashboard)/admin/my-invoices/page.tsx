@@ -76,8 +76,11 @@ export default function AdminMyInvoicesPage() {
         <Table>
           <THead>
             <tr>
+              <Th>#</Th>
               <Th>Site / Task</Th>
-              <Th>Quantity</Th>
+              <Th>Vendor</Th>
+              <Th>Qty</Th>
+              <Th>Unit Price</Th>
               <Th>Amount (PKR)</Th>
               <Th>Status</Th>
               <Th>Submitted</Th>
@@ -87,11 +90,14 @@ export default function AdminMyInvoicesPage() {
           <TBody>
             {invoices.map((inv) => (
               <Tr key={inv.id}>
+                <Td mono muted>{`INV-${String(inv.invoiceNumber).padStart(5, '0')}`}</Td>
                 <Td>
                   <p className="font-medium" style={{ color: 'var(--navy)' }}>{inv.site?.name ?? '—'}</p>
                   <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{inv.task?.name ?? inv.customTaskName ?? '—'}</p>
                 </Td>
-                <Td mono muted>{inv.quantity} {inv.unit}</Td>
+                <Td muted>{inv.vendor?.name ?? '—'}</Td>
+                <Td mono muted>{Number(inv.quantity).toLocaleString()} {inv.unit}</Td>
+                <Td mono muted>{inv.unitCostSnapshot ? `Rs. ${Number(inv.unitCostSnapshot).toLocaleString()}` : '—'}</Td>
                 <Td mono bold>Rs. {Number(inv.amount).toLocaleString()}</Td>
                 <Td>
                   <div>

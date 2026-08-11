@@ -4,7 +4,7 @@ export type User = {
   id: string;
   name: string;
   email: string;
-  role: 'admin' | 'vendor' | 'accountant';
+  role: 'admin' | 'site_supervisor' | 'accountant';
   isActive: boolean;
   createdAt: string;
 };

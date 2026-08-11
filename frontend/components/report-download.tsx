@@ -175,11 +175,11 @@ export function ReportDownload() {
                 placeholder="All sites"
               />
               <ClearableSelect
-                label="Vendor"
+                label="Site Supervisor"
                 value={vendorId}
                 onChange={setVendorId}
                 options={vendorOptions}
-                placeholder="All vendors"
+                placeholder="All supervisors"
                 loading={loadingVendors}
               />
               <ClearableSelect
@@ -260,7 +260,7 @@ export function ReportDownload() {
             <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
               {[
                 siteId   ? sites.find((s) => s.id === siteId)?.name     : 'All sites',
-                vendorId ? vendors.find((v) => v.id === vendorId)?.name  : 'All vendors',
+                vendorId ? vendors.find((v) => v.id === vendorId)?.name  : 'All supervisors',
                 status   ? status.charAt(0).toUpperCase() + status.slice(1) : 'All statuses',
               ].join(' · ')}
               {dateFrom && ` · ${dateFrom} → ${dateTo}`}

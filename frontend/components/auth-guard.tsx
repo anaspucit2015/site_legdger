@@ -22,7 +22,7 @@ export function AuthGuard({ children, allowedRoles }: Props) {
     if (allowedRoles && !allowedRoles.includes(user.role)) {
       const home: Record<string, string> = {
         admin: '/admin',
-        vendor: '/vendor/my-invoices',
+        site_supervisor: '/site-supervisor/my-invoices',
         accountant: '/accountant/invoices',
       };
       router.replace(home[user.role] ?? '/login');

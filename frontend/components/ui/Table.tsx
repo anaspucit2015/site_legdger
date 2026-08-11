@@ -23,7 +23,7 @@ export function TBody({ children }: { children: ReactNode }) {
 export function Th({ children, right }: { children?: ReactNode; right?: boolean }) {
   return (
     <th
-      className={`px-4 py-3 text-xs font-semibold uppercase tracking-wide ${right ? 'text-right' : 'text-left'}`}
+      className={`px-5 py-3.5 text-xs font-semibold uppercase tracking-wide ${right ? 'text-right' : 'text-left'}`}
       style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-body)' }}
     >
       {children}
@@ -58,7 +58,7 @@ interface TdProps {
 export function Td({ children, right, mono, muted, bold }: TdProps) {
   return (
     <td
-      className={`px-4 py-3 ${right ? 'text-right' : ''}`}
+      className={`px-5 py-4 ${right ? 'text-right' : ''}`}
       style={{
         color: muted ? 'var(--text-muted)' : 'var(--navy)',
         fontFamily: mono ? 'var(--font-mono)' : 'var(--font-body)',

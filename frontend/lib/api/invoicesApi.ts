@@ -2,10 +2,12 @@ import { baseApi } from './baseApi';
 
 export type Invoice = {
   id: string;
+  invoiceNumber: number;
   taskId: string | null;
   customTaskName: string | null;
   siteId: string;
-  vendorId: string;
+  submittedById: string;
+  vendorId: string | null;
   unit: string;
   quantity: string;
   unitCostSnapshot: string | null;
@@ -24,6 +26,7 @@ export type Invoice = {
   task?: { name: string; unit: string } | null;
   site?: { name: string };
   vendor?: { name: string } | null;
+  submittedBy?: { name: string } | null;
 };
 
 export const invoicesApi = baseApi.injectEndpoints({
@@ -43,7 +46,7 @@ export const invoicesApi = baseApi.injectEndpoints({
       query: (id) => `/invoices/${id}`,
       providesTags: ['Invoice'],
     }),
-    createInvoice: build.mutation<Invoice, { siteId: string; taskId?: string; customTaskName?: string; customTaskUnit?: string; customTaskUnitCost?: string; quantity: string; amount?: string; description?: string; status?: 'pending' | 'approved' | 'paid' }>({
+    createInvoice: build.mutation<Invoice, { siteId: string; vendorId: string; taskId?: string; customTaskName?: string; customTaskUnit?: string; customTaskUnitCost?: string; quantity: string; amount?: string; description?: string; attachmentUrl?: string; status?: 'pending' | 'approved' | 'paid' }>({
       query: (body) => ({ url: '/invoices', method: 'POST', body }),
       invalidatesTags: ['Invoice'],
     }),
@@ -78,6 +81,14 @@ export const invoicesApi = baseApi.injectEndpoints({
       query: ({ id, ...body }) => ({ url: `/invoices/${id}/pay`, method: 'POST', body }),
       invalidatesTags: ['Invoice'],
     }),
+    adminDeleteInvoice: build.mutation<{ deleted: boolean }, string>({
+      query: (id) => ({ url: `/invoices/${id}`, method: 'DELETE' }),
+      invalidatesTags: ['Invoice'],
+    }),
+    adminUpdateInvoice: build.mutation<Invoice, { id: string; vendorId?: string; quantity?: string; amount?: string; description?: string; attachmentUrl?: string }>({
+      query: ({ id, ...body }) => ({ url: `/invoices/${id}`, method: 'PATCH', body }),
+      invalidatesTags: ['Invoice'],
+    }),
   }),
 });
 
@@ -92,4 +103,6 @@ export const {
   useGetDeleteRequestsQuery,
   useResolveDeleteRequestMutation,
   useReleasePaymentMutation,
+  useAdminDeleteInvoiceMutation,
+  useAdminUpdateInvoiceMutation,
 } = invoicesApi;

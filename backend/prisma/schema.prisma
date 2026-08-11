@@ -9,7 +9,7 @@ datasource db {
 
 enum Role {
   admin
-  vendor
+  site_supervisor
   accountant
 }
 
@@ -30,7 +30,21 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  invoices  Invoice[] @relation("VendorInvoices")
+  invoices  Invoice[] @relation("SubmittedInvoices")
+}
+
+model Vendor {
+  id            String   @id @default(cuid())
+  name          String
+  contactPerson String?
+  phone         String?
+  email         String?
+  address       String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  invoices Invoice[]
 }
 
 model Site {
@@ -72,10 +86,12 @@ model TaskRateHistory {
 
 model Invoice {
   id                   String        @id @default(cuid())
+  invoiceNumber        Int           @unique @default(autoincrement())
   taskId               String?
   customTaskName       String?
   siteId               String
-  vendorId             String
+  submittedById        String
+  vendorId             String?
   unit                 String
   quantity             Decimal
   unitCostSnapshot     Decimal?
@@ -104,7 +120,8 @@ model Invoice {
   syncVersion          Int       @default(1)
   updatedAt            DateTime  @updatedAt
 
-  task   Task? @relation(fields: [taskId], references: [id])
-  site   Site  @relation(fields: [siteId], references: [id])
-  vendor User  @relation("VendorInvoices", fields: [vendorId], references: [id])
+  task        Task?   @relation(fields: [taskId], references: [id])
+  site        Site    @relation(fields: [siteId], references: [id])
+  submittedBy User    @relation("SubmittedInvoices", fields: [submittedById], references: [id])
+  vendor      Vendor? @relation(fields: [vendorId], references: [id])
 }

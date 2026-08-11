@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -25,9 +26,9 @@ import { Roles } from '../common/decorators/roles.decorator';
 export class InvoicesController {
   constructor(private invoicesService: InvoicesService) {}
 
-  // ─── Submit invoice (vendor, admin, accountant) ───────────────────────────
+  // ─── Submit invoice (site_supervisor, admin, accountant) ─────────────────
   @UseGuards(RolesGuard)
-  @Roles('vendor', 'admin', 'accountant')
+  @Roles('site_supervisor', 'admin', 'accountant')
   @Post()
   create(@Body() dto: CreateInvoiceDto, @Req() req: any) {
     return this.invoicesService.create(dto, req.user.id, req.user.role);
@@ -46,19 +47,15 @@ export class InvoicesController {
 
     // mine=true → own submissions only, works for all roles
     if (mine === 'true') {
-      return this.invoicesService.findAll({ vendorId: req.user.id, siteId, status });
+      return this.invoicesService.findAll({ submittedById: req.user.id, siteId, status });
     }
 
-    if (role === 'admin') {
+    if (role === 'admin' || role === 'accountant') {
       return this.invoicesService.findAll({ siteId, vendorId, status });
     }
 
-    if (role === 'accountant') {
-      return this.invoicesService.findForAccountant({ siteId, status });
-    }
-
-    // vendor: no siteId → own invoices; with siteId → all invoices for that site (Site Invoices page)
-    if (!siteId) return this.invoicesService.findAll({ vendorId: req.user.id, status });
+    // site_supervisor: no siteId → own invoices; with siteId → all invoices for that site (Site Invoices page)
+    if (!siteId) return this.invoicesService.findAll({ submittedById: req.user.id, status });
     return this.invoicesService.findAll({ siteId, status });
   }
 
@@ -76,33 +73,41 @@ export class InvoicesController {
     return this.invoicesService.findOne(id);
   }
 
-  // ─── Vendor: edit pending invoice ──────────────────────────────────────────
+  // ─── Admin / Site Supervisor: edit pending invoice ───────────────────────
   @UseGuards(RolesGuard)
-  @Roles('vendor')
+  @Roles('admin', 'site_supervisor')
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: UpdateInvoiceDto, @Req() req: any) {
-    return this.invoicesService.update(id, dto, req.user.id);
+    return this.invoicesService.update(id, dto, req.user.id, req.user.role);
   }
 
-  // ─── Vendor: request delete ───────────────────────────────────────────────
+  // ─── Admin: direct delete (pending or approved) ───────────────────────────
   @UseGuards(RolesGuard)
-  @Roles('vendor')
+  @Roles('admin')
+  @Delete(':id')
+  adminDelete(@Param('id') id: string) {
+    return this.invoicesService.adminDelete(id);
+  }
+
+  // ─── Site Supervisor / Accountant: request delete ────────────────────────
+  @UseGuards(RolesGuard)
+  @Roles('site_supervisor', 'accountant')
   @Post(':id/delete-request')
   requestDelete(@Param('id') id: string, @Req() req: any) {
     return this.invoicesService.requestDelete(id, req.user.id);
   }
 
-  // ─── Admin: approve ────────────────────────────────────────────────────────
+  // ─── Admin / Accountant: approve ─────────────────────────────────────────
   @UseGuards(RolesGuard)
-  @Roles('admin')
+  @Roles('admin', 'accountant')
   @Post(':id/approve')
   approve(@Param('id') id: string, @Req() req: any) {
     return this.invoicesService.approve(id, req.user.id);
   }
 
-  // ─── Admin: reject ─────────────────────────────────────────────────────────
+  // ─── Admin / Accountant: reject ──────────────────────────────────────────
   @UseGuards(RolesGuard)
-  @Roles('admin')
+  @Roles('admin', 'accountant')
   @Post(':id/reject')
   reject(@Param('id') id: string, @Body() dto: RejectInvoiceDto, @Req() req: any) {
     return this.invoicesService.reject(id, dto, req.user.id);

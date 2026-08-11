@@ -7,8 +7,9 @@ import { TasksModule } from './tasks/tasks.module';
 import { InvoicesModule } from './invoices/invoices.module';
 import { ReportsModule } from './reports/reports.module';
 import { UploadsModule } from './uploads/uploads.module';
+import { VendorsModule } from './vendors/vendors.module';
 
 @Module({
-  imports: [PrismaModule, AuthModule, UsersModule, SitesModule, TasksModule, InvoicesModule, ReportsModule, UploadsModule],
+  imports: [PrismaModule, AuthModule, UsersModule, SitesModule, TasksModule, InvoicesModule, ReportsModule, UploadsModule, VendorsModule],
 })
 export class AppModule {}

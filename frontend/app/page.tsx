@@ -13,7 +13,12 @@ export default function Home() {
       router.replace('/login');
       return;
     }
-    router.replace(`/${user.role}`);
+    const roleHome: Record<string, string> = {
+      admin: '/admin',
+      site_supervisor: '/site-supervisor/my-invoices',
+      accountant: '/accountant/invoices',
+    };
+    router.replace(roleHome[user.role] ?? '/login');
   }, [router]);
 
   return null;

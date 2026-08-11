@@ -20,7 +20,12 @@ export default function LoginPage() {
     try {
       const res = await login({ email, password }).unwrap();
       setAuth(res.accessToken, res.user);
-      router.replace(`/${res.user.role}`);
+      const roleHome: Record<string, string> = {
+        admin: '/admin',
+        site_supervisor: '/site-supervisor/my-invoices',
+        accountant: '/accountant/invoices',
+      };
+      router.replace(roleHome[res.user.role] ?? '/login');
     } catch {
       setError('Invalid email or password');
     }
