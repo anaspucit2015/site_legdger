@@ -16,6 +16,20 @@ export class ReportsController {
     return this.reportsService.getVendors();
   }
 
+  @Get('balance')
+  async downloadBalanceReport(
+    @Query('siteId')   siteId:   string | undefined,
+    @Query('vendorId') vendorId: string | undefined,
+    @Res() res: Response,
+  ) {
+    const buffer = await this.reportsService.generateBalanceReport({ siteId, vendorId });
+    const label  = siteId ? `site-${siteId}` : `vendor-${vendorId}`;
+    const filename = `balance-report-${label}-${new Date().toISOString().slice(0, 10)}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(buffer);
+  }
+
   @Get('invoices')
   async downloadInvoiceReport(
     @Query('siteId') siteId: string | undefined,

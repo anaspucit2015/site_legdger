@@ -63,6 +63,17 @@ export class InvoicesController {
     return this.invoicesService.findAll({ siteId, status }, p, l);
   }
 
+  // ─── Balance summary (admin, accountant) ─────────────────────────────────
+  @UseGuards(RolesGuard)
+  @Roles('admin', 'accountant')
+  @Get('balance')
+  getBalance(
+    @Query('siteId')   siteId?: string,
+    @Query('vendorId') vendorId?: string,
+  ) {
+    return this.invoicesService.getBalance({ siteId, vendorId });
+  }
+
   // ─── Admin: pending delete requests queue ─────────────────────────────────
   @UseGuards(RolesGuard)
   @Roles('admin')

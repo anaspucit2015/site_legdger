@@ -1,6 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useGetInvoicesQuery, useGetDeleteRequestsQuery } from '@/lib/api/invoicesApi';
+import { useGetBillsQuery, useGetDeleteRequestsBillsQuery } from '@/lib/api/billsApi';
 import { useGetSitesQuery } from '@/lib/api/sitesApi';
 import { useGetUsersQuery } from '@/lib/api/usersApi';
 import { useGetActiveTasksQuery } from '@/lib/api/tasksApi';
@@ -8,7 +9,7 @@ import { StatusStamp } from '@/components/status-stamp';
 import { TableLoading } from '@/components/ui';
 import { getUser } from '@/lib/auth';
 import {
-  FileText, MapPin, Users, Trash2,
+  FileText, MapPin, Users, Trash2, ReceiptText,
   Clock, CheckCircle, ListChecks, ArrowRight,
 } from 'lucide-react';
 
@@ -58,20 +59,25 @@ function StatCard({
 export default function AdminDashboard() {
   const user = getUser();
   const { data: pendingResult,  isLoading: loadingPending } = useGetInvoicesQuery({ status: 'pending' });
-  const { data: approvedResult } = useGetInvoicesQuery({ status: 'approved' });
-  const { data: sitesResult }    = useGetSitesQuery();
-  const { data: usersResult }    = useGetUsersQuery();
-  const { data: tasks = [] }     = useGetActiveTasksQuery();
-  const { data: deleteResult }   = useGetDeleteRequestsQuery();
+  const { data: approvedResult }    = useGetInvoicesQuery({ status: 'approved' });
+  const { data: pendingBillResult } = useGetBillsQuery({ status: 'pending' });
+  const { data: sitesResult }       = useGetSitesQuery();
+  const { data: usersResult }       = useGetUsersQuery();
+  const { data: tasks = [] }        = useGetActiveTasksQuery();
+  const { data: deleteResult }      = useGetDeleteRequestsQuery();
+  const { data: billDeleteResult }  = useGetDeleteRequestsBillsQuery();
 
-  const pendingInvoices  = pendingResult?.data  ?? [];
-  const approvedInvoices = approvedResult?.data ?? [];
-  const sites            = sitesResult?.data    ?? [];
-  const users            = usersResult?.data    ?? [];
-  const deleteRequests   = deleteResult?.data   ?? [];
+  const pendingInvoices   = pendingResult?.data     ?? [];
+  const approvedInvoices  = approvedResult?.data    ?? [];
+  const pendingBills      = pendingBillResult?.data  ?? [];
+  const sites             = sitesResult?.data        ?? [];
+  const users             = usersResult?.data        ?? [];
+  const deleteRequests    = deleteResult?.data       ?? [];
+  const billDeleteRequests = billDeleteResult?.data  ?? [];
 
   const pendingAmount  = pendingInvoices.reduce((s, i) => s + Number(i.amount), 0);
   const approvedAmount = approvedInvoices.reduce((s, i) => s + Number(i.amount), 0);
+  const pendingBillAmount = pendingBills.reduce((s, b) => s + Number(b.totalAmount), 0);
   const activeSites    = sites.filter((s) => s.isActive).length;
   const activeVendors  = users.filter((u) => u.role === 'site_supervisor' && u.isActive).length;
   const activeAccts    = users.filter((u) => u.role === 'accountant' && u.isActive).length;
@@ -92,7 +98,7 @@ export default function AdminDashboard() {
         </p>
       </div>
 
-      {/* Stat cards — 2×2 grid */}
+      {/* Stat cards */}
       <div className="grid grid-cols-2 gap-4">
         <StatCard
           label="Pending Invoices"
@@ -102,6 +108,15 @@ export default function AdminDashboard() {
           iconColor="#B87A1A"
           iconBg="#FFF8EC"
           href="/admin/invoices"
+        />
+        <StatCard
+          label="Pending Bills"
+          value={pendingBills.length}
+          sub={pendingBills.length > 0 ? `Rs. ${pendingBillAmount.toLocaleString()} awaiting review` : 'All caught up'}
+          icon={ReceiptText}
+          iconColor="#7A5C1E"
+          iconBg="#FFF4E0"
+          href="/admin/bills"
         />
         <StatCard
           label="Approved · Awaiting Payment"
@@ -144,7 +159,27 @@ export default function AdminDashboard() {
               <Trash2 size={15} style={{ color: 'var(--rust)', flexShrink: 0 }} />
               <div className="flex-1">
                 <p className="text-sm font-semibold" style={{ color: 'var(--rust)' }}>
-                  {deleteRequests.length} delete request{deleteRequests.length !== 1 ? 's' : ''} pending review
+                  {deleteRequests.length} invoice delete request{deleteRequests.length !== 1 ? 's' : ''} pending review
+                </p>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Click to resolve</p>
+              </div>
+              <ArrowRight size={14} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+            </div>
+          </Link>
+        )}
+
+        {billDeleteRequests.length > 0 && (
+          <Link href="/admin/bills/delete-requests" className="block">
+            <div
+              className="card px-5 py-4 flex items-center gap-3"
+              style={{ borderLeft: '3px solid var(--rust)' }}
+              onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.boxShadow = '0 4px 16px rgba(27,58,92,0.08)')}
+              onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.boxShadow = '')}
+            >
+              <Trash2 size={15} style={{ color: 'var(--rust)', flexShrink: 0 }} />
+              <div className="flex-1">
+                <p className="text-sm font-semibold" style={{ color: 'var(--rust)' }}>
+                  {billDeleteRequests.length} bill delete request{billDeleteRequests.length !== 1 ? 's' : ''} pending review
                 </p>
                 <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Click to resolve</p>
               </div>

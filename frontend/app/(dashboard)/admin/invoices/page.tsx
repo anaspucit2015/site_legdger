@@ -206,7 +206,32 @@ export default function AdminInvoicesPage() {
       )}
       <Pagination page={page} total={total} limit={20} onChange={setPage} />
 
-      <InvoiceDetailModal invoice={viewTarget} onClose={() => setViewTarget(null)} />
+      <InvoiceDetailModal
+        invoice={viewTarget}
+        onClose={() => setViewTarget(null)}
+        actions={viewTarget && (
+          <>
+            {viewTarget.status === 'pending' && (
+              <>
+                <Button size="sm" variant="ghost" onClick={() => { openEdit(viewTarget); setViewTarget(null); }}>
+                  <Pencil size={13} /> Edit
+                </Button>
+                <Button size="sm" variant="primary" loading={approvingId === viewTarget.id} disabled={!!approvingId || !!rejectingId} onClick={() => handleApprove(viewTarget.id)}>
+                  <Check size={13} /> Approve
+                </Button>
+                <Button size="sm" variant="outline" disabled={!!approvingId || !!rejectingId} onClick={() => { setViewTarget(null); setRejectTarget(viewTarget); }}>
+                  <X size={13} /> Reject
+                </Button>
+              </>
+            )}
+            {['pending', 'approved'].includes(viewTarget.status) && (
+              <Button size="sm" variant="ghost" onClick={() => { setViewTarget(null); setDeleteTarget(viewTarget); }} style={{ color: 'var(--rust)' }}>
+                <Trash2 size={13} /> Delete
+              </Button>
+            )}
+          </>
+        )}
+      />
 
       {/* ── Edit modal ── */}
       <Modal

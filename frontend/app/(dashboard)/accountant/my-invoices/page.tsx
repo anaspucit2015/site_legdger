@@ -9,7 +9,7 @@ import {
   Table, THead, TBody, Th, Tr, Td, TableEmpty, TableLoading,
   PageHeader, Pagination,
 } from '@/components/ui';
-import { Eye, Plus } from 'lucide-react';
+import { Eye, Info, Plus } from 'lucide-react';
 import Link from 'next/link';
 
 const STATUS_OPTIONS = [
@@ -24,6 +24,7 @@ export default function AccountantMyInvoicesPage() {
   const [siteFilter, setSiteFilter]     = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [viewTarget, setViewTarget]     = useState<Invoice | null>(null);
+  const [infoTarget, setInfoTarget]     = useState<{ inv: Invoice; top: number; left: number } | null>(null);
   const [requestDelete] = useRequestDeleteInvoiceMutation();
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
@@ -31,6 +32,12 @@ export default function AccountantMyInvoicesPage() {
   async function handleRequestDelete(id: string) {
     setDeletingId(id);
     try { await requestDelete(id); } finally { setDeletingId(null); }
+  }
+
+  function handleInfoClick(e: React.MouseEvent<HTMLButtonElement>, inv: Invoice) {
+    if (infoTarget?.inv.id === inv.id) { setInfoTarget(null); return; }
+    const rect = e.currentTarget.getBoundingClientRect();
+    setInfoTarget({ inv, top: rect.top - 8, left: rect.right + 8 });
   }
 
   const { data: result, isLoading } = useGetInvoicesQuery({
@@ -112,7 +119,7 @@ export default function AccountantMyInvoicesPage() {
                 <Td mono bold>Rs. {Number(inv.amount).toLocaleString()}</Td>
                 <Td>
                   <div>
-                    <StatusStamp status={inv.status} />
+                    <StatusStamp status={inv.deleteRequested ? 'delete_requested' : inv.status} />
                     {inv.status === 'rejected' && inv.rejectionReason && (
                       <p className="text-xs mt-1" style={{ color: 'var(--rust)' }}>{inv.rejectionReason}</p>
                     )}
@@ -120,7 +127,7 @@ export default function AccountantMyInvoicesPage() {
                 </Td>
                 <Td muted>{new Date(inv.submittedAt).toLocaleDateString()}</Td>
                 <Td right>
-                  <div className="flex gap-2 justify-end">
+                  <div className="flex gap-2 justify-end items-center">
                     <Button size="sm" variant="ghost" onClick={() => setViewTarget(inv)}>
                       <Eye size={13} /> View
                     </Button>
@@ -128,6 +135,20 @@ export default function AccountantMyInvoicesPage() {
                       <Button size="sm" variant="ghost" loading={deletingId === inv.id} disabled={!!deletingId} onClick={() => handleRequestDelete(inv.id)} style={{ color: 'var(--rust)' }}>
                         Request Delete
                       </Button>
+                    )}
+                    {inv.deleteRequested && (
+                      <button
+                        onClick={(e) => handleInfoClick(e, inv)}
+                        className="flex items-center justify-center w-6 h-6 rounded-full cursor-pointer"
+                        style={{
+                          color: infoTarget?.inv.id === inv.id ? 'var(--navy)' : 'var(--text-muted)',
+                          background: infoTarget?.inv.id === inv.id ? 'var(--border)' : 'transparent',
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--border)')}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = infoTarget?.inv.id === inv.id ? 'var(--border)' : 'transparent')}
+                      >
+                        <Info size={13} />
+                      </button>
                     )}
                   </div>
                 </Td>
@@ -138,7 +159,46 @@ export default function AccountantMyInvoicesPage() {
       )}
       <Pagination page={page} total={total} limit={20} onChange={setPage} />
 
-      <InvoiceDetailModal invoice={viewTarget} onClose={() => setViewTarget(null)} />
+      <InvoiceDetailModal
+        invoice={viewTarget}
+        onClose={() => setViewTarget(null)}
+        actions={viewTarget && viewTarget.status === 'pending' && !viewTarget.deleteRequested ? (
+          <Button size="sm" variant="ghost" loading={deletingId === viewTarget.id} disabled={!!deletingId} onClick={() => handleRequestDelete(viewTarget.id)} style={{ color: 'var(--rust)' }}>
+            Request Delete
+          </Button>
+        ) : undefined}
+      />
+
+      {/* Fixed info popover — escapes table overflow */}
+      {infoTarget && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setInfoTarget(null)} />
+          <div
+            style={{
+              position: 'fixed',
+              top: infoTarget.top,
+              left: Math.min(infoTarget.left, window.innerWidth - 308),
+              width: 300,
+              background: 'white',
+              border: '1px solid var(--border)',
+              borderRadius: 10,
+              padding: '14px 16px',
+              boxShadow: '0 8px 24px rgba(27,58,92,0.14)',
+              zIndex: 50,
+              transform: 'translateY(-100%)',
+            }}
+          >
+            <p className="text-xs font-semibold mb-1.5" style={{ color: 'var(--rust)' }}>Deletion Request Pending</p>
+            <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+              You requested this invoice to be deleted
+              {infoTarget.inv.deleteRequestedAt
+                ? ` on ${new Date(infoTarget.inv.deleteRequestedAt).toLocaleDateString('en-PK', { day: 'numeric', month: 'short', year: 'numeric' })}`
+                : ''}.
+              An admin will review and either approve the deletion or deny it. This invoice remains active until a decision is made.
+            </p>
+          </div>
+        </>
+      )}
     </div>
   );
 }

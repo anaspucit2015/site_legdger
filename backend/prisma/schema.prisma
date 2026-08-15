@@ -31,6 +31,7 @@ model User {
   updatedAt DateTime @updatedAt
 
   invoices  Invoice[] @relation("SubmittedInvoices")
+  bills     Bill[]    @relation("SubmittedBills")
 }
 
 model Vendor {
@@ -45,6 +46,7 @@ model Vendor {
   updatedAt     DateTime @updatedAt
 
   invoices Invoice[]
+  bills    Bill[]
 }
 
 model Site {
@@ -57,6 +59,7 @@ model Site {
   updatedAt DateTime @updatedAt
 
   invoices Invoice[]
+  bills    Bill[]
 }
 
 model Task {
@@ -69,8 +72,9 @@ model Task {
   createdBy String
   createdAt DateTime @default(now())
 
-  rateHistory TaskRateHistory[]
-  invoices    Invoice[]
+  rateHistory   TaskRateHistory[]
+  invoices      Invoice[]
+  billLineItems BillLineItem[]
 }
 
 model TaskRateHistory {
@@ -124,4 +128,54 @@ model Invoice {
   site        Site    @relation(fields: [siteId], references: [id])
   submittedBy User    @relation("SubmittedInvoices", fields: [submittedById], references: [id])
   vendor      Vendor? @relation(fields: [vendorId], references: [id])
+}
+
+model Bill {
+  id            String        @id @default(cuid())
+  billNumber    Int           @unique @default(autoincrement())
+  siteId        String
+  vendorId      String?
+  submittedById String
+  totalAmount   Decimal
+  description   String?
+  attachmentUrl String?
+  status        InvoiceStatus @default(pending)
+
+  rejectionReason      String?
+  rejectionReasonOther String?
+
+  deleteRequested   Boolean   @default(false)
+  deleteRequestedBy String?
+  deleteRequestedAt DateTime?
+  deleteApprovedBy  String?
+  deleteDecisionAt  DateTime?
+
+  submittedAt DateTime @default(now())
+  approvedBy  String?
+  approvedAt  DateTime?
+  paidBy      String?
+  paidAt      DateTime?
+  paymentRef  String?
+
+  syncVersion Int      @default(1)
+  updatedAt   DateTime @updatedAt
+
+  site        Site         @relation(fields: [siteId], references: [id])
+  vendor      Vendor?      @relation(fields: [vendorId], references: [id])
+  submittedBy User         @relation("SubmittedBills", fields: [submittedById], references: [id])
+  lineItems   BillLineItem[]
+}
+
+model BillLineItem {
+  id               String   @id @default(cuid())
+  billId           String
+  taskId           String?
+  customTaskName   String?
+  unit             String
+  quantity         Decimal
+  unitCostSnapshot Decimal?
+  amount           Decimal
+
+  bill Bill  @relation(fields: [billId], references: [id], onDelete: Cascade)
+  task Task? @relation(fields: [taskId], references: [id])
 }

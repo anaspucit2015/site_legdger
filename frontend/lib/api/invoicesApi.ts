@@ -2,6 +2,24 @@ import { baseApi } from './baseApi';
 
 export type PaginatedResult<T> = { data: T[]; total: number; page: number; limit: number; };
 
+export type BalanceSubSummary = {
+  totalAmount:    number;
+  paidAmount:     number;
+  approvedAmount: number;
+  pendingAmount:  number;
+  rejectedAmount: number;
+  totalCount:     number;
+  paidCount:      number;
+  approvedCount:  number;
+  pendingCount:   number;
+  rejectedCount:  number;
+};
+
+export type BalanceSummary = BalanceSubSummary & {
+  invoices: BalanceSubSummary;
+  bills:    BalanceSubSummary;
+};
+
 export type Invoice = {
   id: string;
   invoiceNumber: number;
@@ -99,6 +117,15 @@ export const invoicesApi = baseApi.injectEndpoints({
       query: ({ id, ...body }) => ({ url: `/invoices/${id}`, method: 'PATCH', body }),
       invalidatesTags: ['Invoice'],
     }),
+    getInvoiceBalance: build.query<BalanceSummary, { siteId?: string; vendorId?: string }>({
+      query: (params) => {
+        const qs = new URLSearchParams();
+        if (params.siteId)   qs.set('siteId',   params.siteId);
+        if (params.vendorId) qs.set('vendorId', params.vendorId);
+        return `/invoices/balance?${qs}`;
+      },
+      providesTags: ['Invoice'],
+    }),
   }),
 });
 
@@ -115,4 +142,5 @@ export const {
   useReleasePaymentMutation,
   useAdminDeleteInvoiceMutation,
   useAdminUpdateInvoiceMutation,
+  useGetInvoiceBalanceQuery,
 } = invoicesApi;

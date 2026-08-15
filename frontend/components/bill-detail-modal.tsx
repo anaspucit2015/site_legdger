@@ -1,6 +1,6 @@
 'use client';
-import { Invoice } from '@/lib/api/invoicesApi';
-import { Modal } from '@/components/ui';
+import { Bill } from '@/lib/api/billsApi';
+import { Modal, Table, THead, TBody, Th, Tr, Td } from '@/components/ui';
 import { StatusStamp } from '@/components/status-stamp';
 import { CheckCircle, Clock, CreditCard, XCircle, Trash2, ExternalLink } from 'lucide-react';
 
@@ -54,25 +54,25 @@ function TimelineStep({
 }
 
 interface Props {
-  invoice: Invoice | null;
+  bill: Bill | null;
   onClose: () => void;
   actions?: React.ReactNode;
 }
 
-export function InvoiceDetailModal({ invoice: inv, onClose, actions }: Props) {
-  if (!inv) return null;
+export function BillDetailModal({ bill: b, onClose, actions }: Props) {
+  if (!b) return null;
 
-  const isRejected = inv.status === 'rejected';
-  const isPaid     = inv.status === 'paid';
-  const isApproved = inv.status === 'approved' || isPaid;
+  const isRejected = b.status === 'rejected';
+  const isPaid     = b.status === 'paid';
+  const isApproved = b.status === 'approved' || isPaid;
 
   return (
     <Modal
-      open={!!inv}
+      open={!!b}
       onClose={onClose}
-      title={`INV-${String(inv.invoiceNumber).padStart(5, '0')}`}
-      subtitle={`${inv.site?.name ?? '—'} · ${inv.task?.name ?? inv.customTaskName ?? '—'}`}
-      maxWidth={640}
+      title={`BILL-${String(b.billNumber).padStart(5, '0')}`}
+      subtitle={`${b.site?.name ?? '—'} · ${b.lineItems.length} line item${b.lineItems.length !== 1 ? 's' : ''}`}
+      maxWidth={680}
     >
       {/* Amount + status hero */}
       <div
@@ -82,37 +82,59 @@ export function InvoiceDetailModal({ invoice: inv, onClose, actions }: Props) {
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--text-muted)' }}>Total Amount</p>
           <p className="text-2xl font-bold" style={{ color: 'var(--navy)', fontFamily: 'var(--font-mono)' }}>
-            Rs. {Number(inv.amount).toLocaleString()}
+            Rs. {Number(b.totalAmount).toLocaleString()}
           </p>
         </div>
-        <StatusStamp status={inv.status} />
+        <StatusStamp status={b.status} />
       </div>
 
       {/* Detail rows */}
       <div className="mb-5">
-        <Row label="Site"       value={inv.site?.name ?? '—'} />
-        <Row label="Task"       value={inv.task?.name ?? inv.customTaskName ?? '—'} />
-        <Row label="Quantity"   value={`${Number(inv.quantity).toLocaleString()} ${inv.unit}`} mono />
-        {inv.unitCostSnapshot && (
-          <Row label="Rate"     value={`Rs. ${Number(inv.unitCostSnapshot).toLocaleString()} / ${inv.unit}`} mono />
-        )}
-        {inv.vendor && <Row label="Vendor"       value={inv.vendor.name} />}
-        {inv.submittedBy && <Row label="Submitted By" value={inv.submittedBy.name} />}
-        <Row label="Submitted"  value={new Date(inv.submittedAt).toLocaleDateString('en-PK', { day: 'numeric', month: 'short', year: 'numeric' })} />
-        {isPaid && inv.paymentRef && (
-          <Row label="Payment Ref" value={inv.paymentRef} mono />
+        <Row label="Site"         value={b.site?.name ?? '—'} />
+        {b.vendor && <Row label="Vendor"       value={b.vendor.name} />}
+        {b.submittedBy && <Row label="Submitted By" value={b.submittedBy.name} />}
+        <Row label="Submitted"    value={new Date(b.submittedAt).toLocaleDateString('en-PK', { day: 'numeric', month: 'short', year: 'numeric' })} />
+        {isPaid && b.paymentRef && (
+          <Row label="Payment Ref" value={b.paymentRef} mono />
         )}
       </div>
 
+      {/* Line Items table */}
+      <div className="mb-5">
+        <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--text-muted)' }}>Line Items</p>
+        <Table>
+          <THead>
+            <tr>
+              <Th>Task</Th>
+              <Th>Unit</Th>
+              <Th>Qty</Th>
+              <Th>Rate</Th>
+              <Th>Amount</Th>
+            </tr>
+          </THead>
+          <TBody>
+            {b.lineItems.map((item) => (
+              <Tr key={item.id}>
+                <Td bold>{item.task?.name ?? item.customTaskName ?? '—'}</Td>
+                <Td muted>{item.unit}</Td>
+                <Td mono muted>{Number(item.quantity).toLocaleString()}</Td>
+                <Td mono muted>{item.unitCostSnapshot ? `Rs. ${Number(item.unitCostSnapshot).toLocaleString()}` : '—'}</Td>
+                <Td mono bold>Rs. {Number(item.amount).toLocaleString()}</Td>
+              </Tr>
+            ))}
+          </TBody>
+        </Table>
+      </div>
+
       {/* Receipt photo */}
-      {inv.attachmentUrl && (
+      {b.attachmentUrl && (
         <div className="mb-5">
-          <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--text-muted)' }}>Receipt</p>
+          <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--text-muted)' }}>Attachment</p>
           <div className="relative inline-block">
-            <a href={inv.attachmentUrl} target="_blank" rel="noopener noreferrer">
+            <a href={b.attachmentUrl} target="_blank" rel="noopener noreferrer">
               <img
-                src={inv.attachmentUrl}
-                alt="Receipt"
+                src={b.attachmentUrl}
+                alt="Attachment"
                 className="rounded-xl object-cover"
                 style={{ width: 220, height: 220, border: '1.5px solid var(--border)', display: 'block' }}
               />
@@ -128,34 +150,34 @@ export function InvoiceDetailModal({ invoice: inv, onClose, actions }: Props) {
       )}
 
       {/* Description */}
-      {inv.description && (
+      {b.description && (
         <div className="rounded-lg px-4 py-3 mb-5" style={{ background: 'var(--paper)', border: '1px solid var(--border)' }}>
           <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--text-muted)' }}>Description</p>
-          <p className="text-sm" style={{ color: 'var(--navy)' }}>{inv.description}</p>
+          <p className="text-sm" style={{ color: 'var(--navy)' }}>{b.description}</p>
         </div>
       )}
 
       {/* Delete request notice */}
-      {inv.deleteRequested && (
+      {b.deleteRequested && (
         <div className="rounded-lg px-4 py-3 mb-5 flex gap-3" style={{ background: '#FDF0ED', border: '1px solid #f5c4b8' }}>
           <Trash2 size={15} style={{ color: 'var(--rust)', flexShrink: 0, marginTop: 2 }} />
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--rust)' }}>Deletion Requested</p>
             <p className="text-sm" style={{ color: 'var(--rust)' }}>
-              You submitted a request to delete this invoice
-              {inv.deleteRequestedAt ? ` on ${new Date(inv.deleteRequestedAt).toLocaleDateString('en-PK', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}.
-              An admin will review and either approve the deletion or deny it. Until then, this invoice remains active.
+              A request to delete this bill was submitted
+              {b.deleteRequestedAt ? ` on ${new Date(b.deleteRequestedAt).toLocaleDateString('en-PK', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}.
+              An admin will review and either approve the deletion or deny it. Until then, this bill remains active.
             </p>
           </div>
         </div>
       )}
 
       {/* Rejection reason */}
-      {isRejected && inv.rejectionReason && (
+      {isRejected && b.rejectionReason && (
         <div className="rounded-lg px-4 py-3 mb-5" style={{ background: '#fdf0ed', border: '1px solid #f5c4b8' }}>
           <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--rust)' }}>Rejection Reason</p>
           <p className="text-sm" style={{ color: 'var(--rust)' }}>
-            {inv.rejectionReason === 'Other' ? (inv.rejectionReasonOther ?? inv.rejectionReason) : inv.rejectionReason}
+            {b.rejectionReason === 'Other' ? (b.rejectionReasonOther ?? b.rejectionReason) : b.rejectionReason}
           </p>
         </div>
       )}
@@ -164,13 +186,13 @@ export function InvoiceDetailModal({ invoice: inv, onClose, actions }: Props) {
       <div>
         <p className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: 'var(--text-muted)' }}>Timeline</p>
         <div className="flex flex-col gap-3">
-          <TimelineStep icon={Clock}       label="Submitted" date={inv.submittedAt} done color="#E8A33D" />
+          <TimelineStep icon={Clock}       label="Submitted" date={b.submittedAt} done color="#E8A33D" />
           {isRejected
-            ? <TimelineStep icon={XCircle}   label="Rejected"  date={inv.submittedAt} done color="#C4522E" />
-            : <TimelineStep icon={CheckCircle} label="Approved" date={inv.approvedAt}  done={isApproved} color="#2F9E6E" />
+            ? <TimelineStep icon={XCircle}   label="Rejected"  date={b.approvedAt}  done color="#C4522E" />
+            : <TimelineStep icon={CheckCircle} label="Approved" date={b.approvedAt}  done={isApproved} color="#2F9E6E" />
           }
           {!isRejected && (
-            <TimelineStep icon={CreditCard} label="Paid"     date={inv.paidAt}      done={isPaid}     color="#1B3A5C" />
+            <TimelineStep icon={CreditCard} label="Paid"     date={b.paidAt}      done={isPaid}     color="#1B3A5C" />
           )}
         </div>
       </div>

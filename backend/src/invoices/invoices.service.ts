@@ -253,6 +253,52 @@ export class InvoicesService {
     return { data, total, page, limit };
   }
 
+  // ─── Balance Summary ──────────────────────────────────────────────────────
+
+  async getBalance(filter: { siteId?: string; vendorId?: string }) {
+    const where = {
+      ...(filter.siteId   && { siteId:   filter.siteId }),
+      ...(filter.vendorId && { vendorId: filter.vendorId }),
+    };
+
+    const [invoices, bills] = await Promise.all([
+      this.prisma.invoice.findMany({ where, select: { status: true, amount: true } }),
+      this.prisma.bill.findMany({ where, select: { status: true, totalAmount: true } }),
+    ]);
+
+    function tally(rows: { status: string; amount?: any; totalAmount?: any }[]) {
+      const s = { totalAmount: 0, paidAmount: 0, approvedAmount: 0, pendingAmount: 0, rejectedAmount: 0,
+                  totalCount: rows.length, paidCount: 0, approvedCount: 0, pendingCount: 0, rejectedCount: 0 };
+      for (const r of rows) {
+        const amt = Number(r.amount ?? r.totalAmount);
+        s.totalAmount += amt;
+        if (r.status === 'paid')     { s.paidAmount     += amt; s.paidCount++;     }
+        if (r.status === 'approved') { s.approvedAmount += amt; s.approvedCount++; }
+        if (r.status === 'pending')  { s.pendingAmount  += amt; s.pendingCount++;  }
+        if (r.status === 'rejected') { s.rejectedAmount += amt; s.rejectedCount++; }
+      }
+      return s;
+    }
+
+    const inv  = tally(invoices);
+    const bill = tally(bills);
+
+    return {
+      totalAmount:    inv.totalAmount    + bill.totalAmount,
+      paidAmount:     inv.paidAmount     + bill.paidAmount,
+      approvedAmount: inv.approvedAmount + bill.approvedAmount,
+      pendingAmount:  inv.pendingAmount  + bill.pendingAmount,
+      rejectedAmount: inv.rejectedAmount + bill.rejectedAmount,
+      totalCount:     inv.totalCount     + bill.totalCount,
+      paidCount:      inv.paidCount      + bill.paidCount,
+      approvedCount:  inv.approvedCount  + bill.approvedCount,
+      pendingCount:   inv.pendingCount   + bill.pendingCount,
+      rejectedCount:  inv.rejectedCount  + bill.rejectedCount,
+      invoices: inv,
+      bills:    bill,
+    };
+  }
+
   // ─── Accountant: Release Payment ──────────────────────────────────────────
 
   async releasePayment(id: string, dto: ReleasePaymentDto, accountantId: string) {

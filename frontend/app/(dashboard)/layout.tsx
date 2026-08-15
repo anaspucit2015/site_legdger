@@ -10,7 +10,7 @@ import { Logo } from '@/components/logo';
 import {
   FileText, Trash2, ListChecks, MapPin, Users,
   PlusCircle, Wallet, LogOut, LayoutDashboard, ClipboardList, BarChart2,
-  ChevronDown, LucideIcon,
+  ChevronDown, LucideIcon, Scale, ReceiptText,
 } from 'lucide-react';
 
 type NavChild = { label: string; href: string; icon: LucideIcon };
@@ -30,10 +30,26 @@ const navByRole: Record<string, NavEntry[]> = {
         { label: 'Submit Invoice',  href: '/admin/invoices/new',             icon: PlusCircle },
       ],
     },
+    {
+      type: 'group', label: 'Bills', href: '/admin/bills', icon: ReceiptText,
+      children: [
+        { label: 'All Bills',       href: '/admin/bills',                  icon: ReceiptText },
+        { label: 'Delete Requests', href: '/admin/bills/delete-requests',  icon: Trash2 },
+        { label: 'My Bills',        href: '/admin/my-bills',               icon: ClipboardList },
+        { label: 'Submit Bill',     href: '/admin/bills/new',              icon: PlusCircle },
+      ],
+    },
     { type: 'link', label: 'Tasks',   href: '/admin/tasks',   icon: ListChecks },
     { type: 'link', label: 'Sites',   href: '/admin/sites',   icon: MapPin },
     { type: 'link', label: 'Vendors', href: '/admin/vendors', icon: Users },
     { type: 'link', label: 'Users',   href: '/admin/users',   icon: Users },
+    {
+      type: 'group', label: 'Balance', href: '/admin/balance', icon: Scale,
+      children: [
+        { label: 'Site Balance',   href: '/admin/balance/site',   icon: MapPin },
+        { label: 'Vendor Balance', href: '/admin/balance/vendor', icon: Wallet },
+      ],
+    },
     { type: 'link', label: 'Reports', href: '/admin/reports', icon: BarChart2 },
   ],
   site_supervisor: [
@@ -43,6 +59,14 @@ const navByRole: Record<string, NavEntry[]> = {
         { label: 'My Invoices',    href: '/site-supervisor/my-invoices',  icon: ClipboardList },
         { label: 'Site Invoices',  href: '/site-supervisor/invoices',     icon: FileText },
         { label: 'Submit Invoice', href: '/site-supervisor/invoices/new', icon: PlusCircle },
+      ],
+    },
+    {
+      type: 'group', label: 'Bills', href: '/site-supervisor/my-bills', icon: ReceiptText,
+      children: [
+        { label: 'My Bills',    href: '/site-supervisor/my-bills',  icon: ClipboardList },
+        { label: 'Site Bills', href: '/site-supervisor/bills',      icon: ReceiptText },
+        { label: 'Submit Bill', href: '/site-supervisor/bills/new', icon: PlusCircle },
       ],
     },
   ],
@@ -55,10 +79,25 @@ const navByRole: Record<string, NavEntry[]> = {
         { label: 'Submit Invoice', href: '/accountant/invoices/new', icon: PlusCircle },
       ],
     },
+    {
+      type: 'group', label: 'Bills', href: '/accountant/bills', icon: ReceiptText,
+      children: [
+        { label: 'All Bills',   href: '/accountant/bills',      icon: ReceiptText },
+        { label: 'My Bills',    href: '/accountant/my-bills',   icon: ClipboardList },
+        { label: 'Submit Bill', href: '/accountant/bills/new',  icon: PlusCircle },
+      ],
+    },
     { type: 'link', label: 'Tasks',   href: '/admin/tasks',   icon: ListChecks },
     { type: 'link', label: 'Sites',   href: '/admin/sites',   icon: MapPin },
     { type: 'link', label: 'Vendors', href: '/admin/vendors', icon: Users },
     { type: 'link', label: 'Users',   href: '/admin/users',   icon: Users },
+    {
+      type: 'group', label: 'Balance', href: '/accountant/balance', icon: Scale,
+      children: [
+        { label: 'Site Balance',   href: '/accountant/balance/site',   icon: MapPin },
+        { label: 'Vendor Balance', href: '/accountant/balance/vendor', icon: Wallet },
+      ],
+    },
     { type: 'link', label: 'Reports', href: '/accountant/reports', icon: BarChart2 },
   ],
 };
@@ -82,7 +121,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   function toggleGroup(href: string) {
     setOpenGroups((prev) =>
-      prev.includes(href) ? prev.filter((h) => h !== href) : [...prev, href],
+      prev.includes(href) ? [] : [href],
     );
   }
 
@@ -229,7 +268,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* Main */}
         <main className="flex-1 overflow-y-auto" style={{ background: 'var(--paper)' }}>
-          <div className="p-8 max-w-7xl">{children}</div>
+          <div className="p-8">{children}</div>
         </main>
       </div>
     </AuthGuard>

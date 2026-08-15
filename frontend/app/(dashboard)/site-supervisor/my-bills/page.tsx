@@ -1,9 +1,9 @@
 'use client';
 import { useState } from 'react';
-import { useGetInvoicesQuery, useRequestDeleteInvoiceMutation, Invoice } from '@/lib/api/invoicesApi';
+import { useGetBillsQuery, useRequestDeleteBillMutation, Bill } from '@/lib/api/billsApi';
 import { useGetActiveSitesQuery } from '@/lib/api/sitesApi';
 import { StatusStamp } from '@/components/status-stamp';
-import { InvoiceDetailModal } from '@/components/invoice-detail-modal';
+import { BillDetailModal } from '@/components/bill-detail-modal';
 import {
   Button, NativeSelect,
   Table, THead, TBody, Th, Tr, Td, TableEmpty, TableLoading,
@@ -19,13 +19,13 @@ const STATUS_OPTIONS = [
   { value: 'paid',     label: 'Paid'     },
 ];
 
-export default function MyInvoicesPage() {
+export default function MyBillsPage() {
   const { data: sites = [] } = useGetActiveSitesQuery();
   const [siteFilter, setSiteFilter]     = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const [viewTarget, setViewTarget] = useState<Invoice | null>(null);
-  const [infoTarget, setInfoTarget] = useState<{ inv: Invoice; top: number; left: number } | null>(null);
-  const [requestDelete] = useRequestDeleteInvoiceMutation();
+  const [viewTarget, setViewTarget] = useState<Bill | null>(null);
+  const [infoTarget, setInfoTarget] = useState<{ bill: Bill; top: number; left: number } | null>(null);
+  const [requestDelete] = useRequestDeleteBillMutation();
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
 
@@ -34,42 +34,41 @@ export default function MyInvoicesPage() {
     try { await requestDelete(id); } finally { setDeletingId(null); }
   }
 
-  function handleInfoClick(e: React.MouseEvent<HTMLButtonElement>, inv: Invoice) {
-    if (infoTarget?.inv.id === inv.id) { setInfoTarget(null); return; }
+  function handleInfoClick(e: React.MouseEvent<HTMLButtonElement>, bill: Bill) {
+    if (infoTarget?.bill.id === bill.id) { setInfoTarget(null); return; }
     const rect = e.currentTarget.getBoundingClientRect();
-    setInfoTarget({ inv, top: rect.top - 8, left: rect.right + 8 });
+    setInfoTarget({ bill, top: rect.top - 8, left: rect.right + 8 });
   }
 
-  // No siteId in query → backend returns this supervisor's own invoices
-  const { data: result, isLoading } = useGetInvoicesQuery({
+  const { data: result, isLoading } = useGetBillsQuery({
     mine: true,
     ...(siteFilter   ? { siteId:  siteFilter   } : {}),
     ...(statusFilter ? { status: statusFilter } : {}),
     page,
   });
-  const invoices = result?.data ?? [];
+  const bills = result?.data ?? [];
   const total = result?.total ?? 0;
 
   const siteOptions = sites.map((s) => ({ value: s.id, label: s.name }));
-  const totalAmount = invoices.reduce((s, i) => s + Number(i.amount), 0);
+  const totalAmount = bills.reduce((s, b) => s + Number(b.totalAmount), 0);
 
   return (
     <div>
       <PageHeader
-        title="My Invoices"
+        title="My Bills"
         subtitle={
           total > 0
-            ? `${total} invoice${total !== 1 ? 's' : ''} · Rs. ${totalAmount.toLocaleString()}`
-            : 'All invoices you have submitted'
+            ? `${total} bill${total !== 1 ? 's' : ''} · Rs. ${totalAmount.toLocaleString()}`
+            : 'All bills you have submitted'
         }
         action={
           <div className="flex gap-2">
             <Link
-              href="/site-supervisor/invoices/new"
+              href="/site-supervisor/bills/new"
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all"
               style={{ background: 'var(--navy)', color: '#fff' }}
             >
-              <Plus size={14} /> New Invoice
+              <Plus size={14} /> New Bill
             </Link>
             <NativeSelect
               value={siteFilter}
@@ -89,64 +88,60 @@ export default function MyInvoicesPage() {
 
       {isLoading ? (
         <TableLoading />
-      ) : invoices.length === 0 ? (
-        <TableEmpty message="No invoices found." />
+      ) : bills.length === 0 ? (
+        <TableEmpty message="No bills found." />
       ) : (
         <Table>
           <THead>
             <tr>
               <Th>#</Th>
-              <Th>Site / Task</Th>
-              <Th>Vendor</Th>
-              <Th>Qty</Th>
-              <Th>Unit Price</Th>
-              <Th>Amount (PKR)</Th>
+              <Th>Site / Vendor</Th>
+              <Th>Line Items</Th>
+              <Th>Total (PKR)</Th>
               <Th>Status</Th>
               <Th>Submitted</Th>
               <Th right />
             </tr>
           </THead>
           <TBody>
-            {invoices.map((inv) => (
-              <Tr key={inv.id}>
-                <Td mono muted>{`INV-${String(inv.invoiceNumber).padStart(5, '0')}`}</Td>
+            {bills.map((bill) => (
+              <Tr key={bill.id}>
+                <Td mono muted>{`BILL-${String(bill.billNumber).padStart(5, '0')}`}</Td>
                 <Td>
-                  <p className="font-medium" style={{ color: 'var(--navy)' }}>{inv.site?.name ?? '—'}</p>
-                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{inv.task?.name ?? inv.customTaskName ?? '—'}</p>
+                  <p className="font-medium" style={{ color: 'var(--navy)' }}>{bill.site?.name ?? '—'}</p>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{bill.vendor?.name ?? 'No vendor'}</p>
                 </Td>
-                <Td muted>{inv.vendor?.name ?? '—'}</Td>
-                <Td mono muted>{Number(inv.quantity).toLocaleString()} {inv.unit}</Td>
-                <Td mono muted>{inv.unitCostSnapshot ? `Rs. ${Number(inv.unitCostSnapshot).toLocaleString()}` : '—'}</Td>
-                <Td mono bold>Rs. {Number(inv.amount).toLocaleString()}</Td>
+                <Td muted>{bill.lineItems.length} item{bill.lineItems.length !== 1 ? 's' : ''}</Td>
+                <Td mono bold>Rs. {Number(bill.totalAmount).toLocaleString()}</Td>
                 <Td>
                   <div>
-                    <StatusStamp status={inv.deleteRequested ? 'delete_requested' : inv.status} />
-                    {inv.status === 'rejected' && inv.rejectionReason && (
-                      <p className="text-xs mt-1" style={{ color: 'var(--rust)' }}>{inv.rejectionReason}</p>
+                    <StatusStamp status={bill.deleteRequested ? 'delete_requested' : bill.status} />
+                    {bill.status === 'rejected' && bill.rejectionReason && (
+                      <p className="text-xs mt-1" style={{ color: 'var(--rust)' }}>{bill.rejectionReason}</p>
                     )}
                   </div>
                 </Td>
-                <Td muted>{new Date(inv.submittedAt).toLocaleDateString()}</Td>
+                <Td muted>{new Date(bill.submittedAt).toLocaleDateString()}</Td>
                 <Td right>
                   <div className="flex gap-2 justify-end items-center">
-                    <Button size="sm" variant="ghost" onClick={() => setViewTarget(inv)}>
+                    <Button size="sm" variant="ghost" onClick={() => setViewTarget(bill)}>
                       <Eye size={13} /> View
                     </Button>
-                    {inv.status === 'pending' && !inv.deleteRequested && (
-                      <Button size="sm" variant="ghost" loading={deletingId === inv.id} disabled={!!deletingId} onClick={() => handleRequestDelete(inv.id)} style={{ color: 'var(--rust)' }}>
+                    {bill.status === 'pending' && !bill.deleteRequested && (
+                      <Button size="sm" variant="ghost" loading={deletingId === bill.id} disabled={!!deletingId} onClick={() => handleRequestDelete(bill.id)} style={{ color: 'var(--rust)' }}>
                         Request Delete
                       </Button>
                     )}
-                    {inv.deleteRequested && (
+                    {bill.deleteRequested && (
                       <button
-                        onClick={(e) => handleInfoClick(e, inv)}
+                        onClick={(e) => handleInfoClick(e, bill)}
                         className="flex items-center justify-center w-6 h-6 rounded-full cursor-pointer"
                         style={{
-                          color: infoTarget?.inv.id === inv.id ? 'var(--navy)' : 'var(--text-muted)',
-                          background: infoTarget?.inv.id === inv.id ? 'var(--border)' : 'transparent',
+                          color: infoTarget?.bill.id === bill.id ? 'var(--navy)' : 'var(--text-muted)',
+                          background: infoTarget?.bill.id === bill.id ? 'var(--border)' : 'transparent',
                         }}
                         onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--border)')}
-                        onMouseLeave={(e) => (e.currentTarget.style.background = infoTarget?.inv.id === inv.id ? 'var(--border)' : 'transparent')}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = infoTarget?.bill.id === bill.id ? 'var(--border)' : 'transparent')}
                       >
                         <Info size={13} />
                       </button>
@@ -160,8 +155,8 @@ export default function MyInvoicesPage() {
       )}
       <Pagination page={page} total={total} limit={20} onChange={setPage} />
 
-      <InvoiceDetailModal
-        invoice={viewTarget}
+      <BillDetailModal
+        bill={viewTarget}
         onClose={() => setViewTarget(null)}
         actions={viewTarget && viewTarget.status === 'pending' && !viewTarget.deleteRequested ? (
           <Button size="sm" variant="ghost" loading={deletingId === viewTarget.id} disabled={!!deletingId} onClick={() => handleRequestDelete(viewTarget.id)} style={{ color: 'var(--rust)' }}>
@@ -170,7 +165,7 @@ export default function MyInvoicesPage() {
         ) : undefined}
       />
 
-      {/* Fixed info popover — escapes table overflow */}
+      {/* Fixed info popover */}
       {infoTarget && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setInfoTarget(null)} />
@@ -191,11 +186,11 @@ export default function MyInvoicesPage() {
           >
             <p className="text-xs font-semibold mb-1.5" style={{ color: 'var(--rust)' }}>Deletion Request Pending</p>
             <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-              You requested this invoice to be deleted
-              {infoTarget.inv.deleteRequestedAt
-                ? ` on ${new Date(infoTarget.inv.deleteRequestedAt).toLocaleDateString('en-PK', { day: 'numeric', month: 'short', year: 'numeric' })}`
+              You requested this bill to be deleted
+              {infoTarget.bill.deleteRequestedAt
+                ? ` on ${new Date(infoTarget.bill.deleteRequestedAt).toLocaleDateString('en-PK', { day: 'numeric', month: 'short', year: 'numeric' })}`
                 : ''}.
-              An admin will review and either approve the deletion or deny it. This invoice remains active until a decision is made.
+              An admin will review and either approve the deletion or deny it. This bill remains active until a decision is made.
             </p>
           </div>
         </>

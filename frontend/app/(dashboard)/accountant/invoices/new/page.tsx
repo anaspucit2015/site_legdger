@@ -6,7 +6,7 @@ import { useGetActiveTasksQuery } from '@/lib/api/tasksApi';
 import { useGetActiveVendorsQuery } from '@/lib/api/vendorsApi';
 import { useCreateInvoiceMutation } from '@/lib/api/invoicesApi';
 import {
-  Button, Input, Textarea, Select,
+  Button, Input, Textarea, Select, SearchableSelect,
   PageHeader,
 } from '@/components/ui';
 import { ReceiptUpload } from '@/components/receipt-upload';
@@ -108,7 +108,7 @@ export default function AccountantNewInvoicePage() {
 
       <div className="card p-7" style={{ maxWidth: '520px' }}>
         <form onSubmit={handleSubmit} className="space-y-5">
-          <Select
+          <SearchableSelect
             label="Site"
             value={siteId}
             onChange={setSiteId}
@@ -116,7 +116,7 @@ export default function AccountantNewInvoicePage() {
             placeholder="Select site…"
           />
 
-          <Select
+          <SearchableSelect
             label="Vendor"
             value={vendorId}
             onChange={setVendorId}
@@ -125,7 +125,7 @@ export default function AccountantNewInvoicePage() {
           />
 
           {!isCustomMode && (
-            <Select
+            <SearchableSelect
               label="Task"
               value={taskId}
               onChange={setTaskId}

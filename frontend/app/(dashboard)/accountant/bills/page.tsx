@@ -1,20 +1,20 @@
 'use client';
 import { useState } from 'react';
 import {
-  useGetInvoicesQuery,
-  useApproveInvoiceMutation,
-  useRejectInvoiceMutation,
-  useReleasePaymentMutation,
-  Invoice,
-} from '@/lib/api/invoicesApi';
+  useGetBillsQuery,
+  useApproveBillMutation,
+  useRejectBillMutation,
+  useReleasePaymentBillMutation,
+  Bill,
+} from '@/lib/api/billsApi';
 import { StatusStamp } from '@/components/status-stamp';
 import {
   Button, Input, Select, Textarea, NativeSelect, Modal,
   Table, THead, TBody, Th, Tr, Td, TableEmpty, TableLoading,
   PageHeader, Pagination,
 } from '@/components/ui';
+import { BillDetailModal } from '@/components/bill-detail-modal';
 import { Check, X, Eye, CreditCard } from 'lucide-react';
-import { InvoiceDetailModal } from '@/components/invoice-detail-modal';
 
 const REJECTION_REASONS = [
   'Duplicate submission',
@@ -34,25 +34,28 @@ const STATUS_OPTIONS = [
 
 const REJECTION_OPTIONS = REJECTION_REASONS.map((r) => ({ value: r, label: r }));
 
-export default function AccountantInvoicesPage() {
+export default function AccountantBillsPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
-  const { data: result, isLoading } = useGetInvoicesQuery({ status: statusFilter || undefined, page });
-  const invoices = result?.data ?? [];
+  const { data: result, isLoading } = useGetBillsQuery({ status: statusFilter || undefined, page });
+  const bills = result?.data ?? [];
   const total = result?.total ?? 0;
-  const [approve] = useApproveInvoiceMutation();
-  const [reject]  = useRejectInvoiceMutation();
-  const [releasePayment] = useReleasePaymentMutation();
 
-  const [viewTarget,    setViewTarget]    = useState<Invoice | null>(null);
-  const [rejectTarget,  setRejectTarget]  = useState<Invoice | null>(null);
-  const [payTarget,     setPayTarget]     = useState<Invoice | null>(null);
+  const [approve]        = useApproveBillMutation();
+  const [reject]         = useRejectBillMutation();
+  const [releasePayment] = useReleasePaymentBillMutation();
+
+  const [viewTarget,   setViewTarget]   = useState<Bill | null>(null);
+  const [rejectTarget, setRejectTarget] = useState<Bill | null>(null);
+  const [payTarget,    setPayTarget]    = useState<Bill | null>(null);
+
   const [rejectionReason,      setRejectionReason]      = useState('');
   const [rejectionReasonOther, setRejectionReasonOther] = useState('');
-  const [paymentRef,   setPaymentRef]   = useState('');
-  const [approvingId,  setApprovingId]  = useState<string | null>(null);
-  const [rejectingId,  setRejectingId]  = useState<string | null>(null);
-  const [paying,       setPaying]       = useState(false);
+  const [paymentRef, setPaymentRef] = useState('');
+
+  const [approvingId, setApprovingId] = useState<string | null>(null);
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [paying,      setPaying]      = useState(false);
 
   async function handleApprove(id: string) {
     setApprovingId(id);
@@ -84,13 +87,13 @@ export default function AccountantInvoicesPage() {
     }
   }
 
-  const totalAmount = invoices.reduce((sum, inv) => sum + Number(inv.amount), 0);
+  const totalAmount = bills.reduce((sum, b) => sum + Number(b.totalAmount), 0);
 
   return (
     <div>
       <PageHeader
-        title="Invoices"
-        subtitle={`${total} invoice${total !== 1 ? 's' : ''} · Rs. ${totalAmount.toLocaleString()}`}
+        title="Bills"
+        subtitle={`${total} bill${total !== 1 ? 's' : ''} · Rs. ${totalAmount.toLocaleString()}`}
         action={
           <NativeSelect
             value={statusFilter}
@@ -103,54 +106,50 @@ export default function AccountantInvoicesPage() {
 
       {isLoading ? (
         <TableLoading />
-      ) : invoices.length === 0 ? (
-        <TableEmpty message="No invoices found." />
+      ) : bills.length === 0 ? (
+        <TableEmpty message="No bills found." />
       ) : (
         <Table>
           <THead>
             <tr>
               <Th>#</Th>
-              <Th>Site / Task</Th>
-              <Th>Vendor</Th>
-              <Th>Qty</Th>
-              <Th>Unit Price</Th>
-              <Th>Amount (PKR)</Th>
+              <Th>Site / Vendor</Th>
+              <Th>Line Items</Th>
+              <Th>Total (PKR)</Th>
               <Th>Status</Th>
               <Th>Submitted</Th>
               <Th right />
             </tr>
           </THead>
           <TBody>
-            {invoices.map((inv) => (
-              <Tr key={inv.id}>
-                <Td mono muted>{`INV-${String(inv.invoiceNumber).padStart(5, '0')}`}</Td>
+            {bills.map((bill) => (
+              <Tr key={bill.id}>
+                <Td mono muted>{`BILL-${String(bill.billNumber).padStart(5, '0')}`}</Td>
                 <Td>
-                  <p className="font-medium" style={{ color: 'var(--navy)' }}>{inv.site?.name ?? '—'}</p>
-                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{inv.task?.name ?? inv.customTaskName ?? '—'}</p>
+                  <p className="font-medium" style={{ color: 'var(--navy)' }}>{bill.site?.name ?? '—'}</p>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{bill.vendor?.name ?? 'No vendor'}</p>
                 </Td>
-                <Td muted>{inv.vendor?.name ?? '—'}</Td>
-                <Td mono muted>{Number(inv.quantity).toLocaleString()} {inv.unit}</Td>
-                <Td mono muted>{inv.unitCostSnapshot ? `Rs. ${Number(inv.unitCostSnapshot).toLocaleString()}` : '—'}</Td>
-                <Td mono bold>Rs. {Number(inv.amount).toLocaleString()}</Td>
-                <Td><StatusStamp status={inv.status} /></Td>
-                <Td muted>{new Date(inv.submittedAt).toLocaleDateString()}</Td>
+                <Td muted>{bill.lineItems.length} item{bill.lineItems.length !== 1 ? 's' : ''}</Td>
+                <Td mono bold>Rs. {Number(bill.totalAmount).toLocaleString()}</Td>
+                <Td><StatusStamp status={bill.status} /></Td>
+                <Td muted>{new Date(bill.submittedAt).toLocaleDateString()}</Td>
                 <Td right>
                   <div className="flex gap-2 justify-end">
-                    <Button size="sm" variant="ghost" onClick={() => setViewTarget(inv)}>
+                    <Button size="sm" variant="ghost" onClick={() => setViewTarget(bill)}>
                       <Eye size={13} /> View
                     </Button>
-                    {inv.status === 'pending' && (
+                    {bill.status === 'pending' && (
                       <>
-                        <Button size="sm" variant="primary" loading={approvingId === inv.id} disabled={!!approvingId || !!rejectingId} onClick={() => handleApprove(inv.id)}>
+                        <Button size="sm" variant="primary" loading={approvingId === bill.id} disabled={!!approvingId || !!rejectingId} onClick={() => handleApprove(bill.id)}>
                           <Check size={13} /> Approve
                         </Button>
-                        <Button size="sm" variant="outline" disabled={!!approvingId || !!rejectingId} onClick={() => setRejectTarget(inv)}>
+                        <Button size="sm" variant="outline" disabled={!!approvingId || !!rejectingId} onClick={() => setRejectTarget(bill)}>
                           <X size={13} /> Reject
                         </Button>
                       </>
                     )}
-                    {inv.status === 'approved' && (
-                      <Button size="sm" variant="primary" onClick={() => { setPayTarget(inv); setPaymentRef(''); }}>
+                    {bill.status === 'approved' && (
+                      <Button size="sm" variant="primary" onClick={() => { setPayTarget(bill); setPaymentRef(''); }}>
                         <CreditCard size={13} /> Release Payment
                       </Button>
                     )}
@@ -163,8 +162,8 @@ export default function AccountantInvoicesPage() {
       )}
       <Pagination page={page} total={total} limit={20} onChange={setPage} />
 
-      <InvoiceDetailModal
-        invoice={viewTarget}
+      <BillDetailModal
+        bill={viewTarget}
         onClose={() => setViewTarget(null)}
         actions={viewTarget && (
           <>
@@ -190,8 +189,8 @@ export default function AccountantInvoicesPage() {
       <Modal
         open={!!rejectTarget}
         onClose={() => { setRejectTarget(null); setRejectionReason(''); setRejectionReasonOther(''); }}
-        title="Reject Invoice"
-        subtitle={rejectTarget ? `${rejectTarget.site?.name} · ${rejectTarget.task?.name ?? rejectTarget.customTaskName} · Rs. ${Number(rejectTarget.amount).toLocaleString()}` : undefined}
+        title="Reject Bill"
+        subtitle={rejectTarget ? `${rejectTarget.site?.name} · Rs. ${Number(rejectTarget.totalAmount).toLocaleString()}` : undefined}
       >
         <div className="space-y-3">
           <Select
@@ -223,12 +222,12 @@ export default function AccountantInvoicesPage() {
         open={!!payTarget}
         onClose={() => setPayTarget(null)}
         title="Release Payment"
-        subtitle={payTarget ? `${payTarget.site?.name} · ${payTarget.task?.name ?? payTarget.customTaskName}` : undefined}
+        subtitle={payTarget ? `${payTarget.site?.name} · ${payTarget.vendor?.name ?? 'No vendor'}` : undefined}
       >
         <div className="space-y-4">
           {payTarget && (
             <p className="font-ledger text-2xl font-semibold" style={{ color: 'var(--navy)' }}>
-              Rs. {Number(payTarget.amount).toLocaleString()}
+              Rs. {Number(payTarget.totalAmount).toLocaleString()}
             </p>
           )}
           <Input
