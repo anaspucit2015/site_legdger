@@ -72,7 +72,7 @@ export default function AdminBillsPage() {
 
   async function handleApprove(id: string) {
     setApprovingId(id);
-    try { await approve(id); } finally { setApprovingId(null); }
+    try { await approve(id); setViewTarget(null); } finally { setApprovingId(null); }
   }
 
   async function handleRejectSubmit() {

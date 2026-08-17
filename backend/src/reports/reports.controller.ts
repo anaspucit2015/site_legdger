@@ -16,6 +16,11 @@ export class ReportsController {
     return this.reportsService.getVendors();
   }
 
+  @Get('supervisors')
+  getSupervisors() {
+    return this.reportsService.getSupervisors();
+  }
+
   @Get('balance')
   async downloadBalanceReport(
     @Query('siteId')   siteId:   string | undefined,
@@ -25,6 +30,44 @@ export class ReportsController {
     const buffer = await this.reportsService.generateBalanceReport({ siteId, vendorId });
     const label  = siteId ? `site-${siteId}` : `vendor-${vendorId}`;
     const filename = `balance-report-${label}-${new Date().toISOString().slice(0, 10)}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(buffer);
+  }
+
+  @Get('combined')
+  async downloadCombinedReport(
+    @Query('siteId')       siteId:       string | undefined,
+    @Query('vendorId')     vendorId:     string | undefined,
+    @Query('supervisorId') supervisorId: string | undefined,
+    @Query('dateFrom')     dateFrom:     string | undefined,
+    @Query('dateTo')       dateTo:       string | undefined,
+    @Query('status')       status:       string | undefined,
+    @Res() res: Response,
+  ) {
+    const buffer   = await this.reportsService.generateCombinedReport({ siteId, vendorId, supervisorId, dateFrom, dateTo, status });
+    const timestamp = new Date().toISOString().slice(0, 10);
+    const filename  = `report-${timestamp}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(buffer);
+  }
+
+  @Get('bills')
+  async downloadBillReport(
+    @Query('siteId')        siteId:        string | undefined,
+    @Query('vendorId')      vendorId:      string | undefined,
+    @Query('supervisorId')  supervisorId:  string | undefined,
+    @Query('dateFrom')      dateFrom:      string | undefined,
+    @Query('dateTo')        dateTo:        string | undefined,
+    @Query('status')        status:        string | undefined,
+    @Res() res: Response,
+  ) {
+    const buffer = await this.reportsService.generateBillReport({ siteId, vendorId, supervisorId, dateFrom, dateTo, status });
+
+    const timestamp = new Date().toISOString().slice(0, 10);
+    const filename  = `bills-report-${timestamp}.xlsx`;
+
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.send(buffer);

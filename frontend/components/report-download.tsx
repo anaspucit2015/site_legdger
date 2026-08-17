@@ -38,27 +38,23 @@ function ClearableSelect({
   );
 }
 
-type Vendor = { id: string; name: string };
+type Person = { id: string; name: string };
 type Preset = 'daily' | 'weekly' | 'monthly' | 'custom';
 
 const PRESETS: { value: Preset; label: string }[] = [
-  { value: 'daily',   label: 'Today' },
-  { value: 'weekly',  label: 'This Week' },
-  { value: 'monthly', label: 'This Month' },
+  { value: 'daily',   label: 'Today'        },
+  { value: 'weekly',  label: 'This Week'    },
+  { value: 'monthly', label: 'This Month'   },
   { value: 'custom',  label: 'Custom Range' },
 ];
 
 function getPresetRange(preset: Preset): { from: string; to: string } {
-  const now = new Date();
+  const now   = new Date();
   const toStr = now.toISOString().slice(0, 10);
-
-  if (preset === 'daily') {
-    return { from: toStr, to: toStr };
-  }
+  if (preset === 'daily')   return { from: toStr, to: toStr };
   if (preset === 'weekly') {
-    const day = now.getDay(); // 0=Sun
     const monday = new Date(now);
-    monday.setDate(now.getDate() - ((day + 6) % 7));
+    monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
     return { from: monday.toISOString().slice(0, 10), to: toStr };
   }
   if (preset === 'monthly') {
@@ -71,18 +67,20 @@ function getPresetRange(preset: Preset): { from: string; to: string } {
 export function ReportDownload() {
   const { data: sites = [] } = useGetActiveSitesQuery();
 
-  const [siteId, setSiteId]         = useState('');
-  const [vendorId, setVendorId]     = useState('');
-  const [status, setStatus]         = useState('');
-  const [vendors, setVendors]       = useState<Vendor[]>([]);
-  const [loadingVendors, setLoadingVendors] = useState(false);
-  const [preset, setPreset]         = useState<Preset>('monthly');
-  const [dateFrom, setDateFrom]     = useState('');
-  const [dateTo, setDateTo]         = useState('');
-  const [downloading, setDownloading] = useState(false);
-  const [error, setError]           = useState('');
+  const [siteId,        setSiteId]        = useState('');
+  const [vendorId,      setVendorId]      = useState('');
+  const [supervisorId,  setSupervisorId]  = useState('');
+  const [status,        setStatus]        = useState('');
+  const [vendors,       setVendors]       = useState<Person[]>([]);
+  const [supervisors,   setSupervisors]   = useState<Person[]>([]);
+  const [loadingVendors,      setLoadingVendors]      = useState(false);
+  const [loadingSupervisors,  setLoadingSupervisors]  = useState(false);
+  const [preset,        setPreset]        = useState<Preset>('monthly');
+  const [dateFrom,      setDateFrom]      = useState('');
+  const [dateTo,        setDateTo]        = useState('');
+  const [downloading,   setDownloading]   = useState(false);
+  const [error,         setError]         = useState('');
 
-  // Populate dates when preset changes
   useEffect(() => {
     if (preset !== 'custom') {
       const { from, to } = getPresetRange(preset);
@@ -91,9 +89,8 @@ export function ReportDownload() {
     }
   }, [preset]);
 
-  // Load vendors on mount
   useEffect(() => {
-    async function load() {
+    async function loadVendors() {
       setLoadingVendors(true);
       try {
         const res = await fetch(
@@ -105,11 +102,25 @@ export function ReportDownload() {
         setLoadingVendors(false);
       }
     }
-    load();
+    async function loadSupervisors() {
+      setLoadingSupervisors(true);
+      try {
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/reports/supervisors`,
+          { headers: { Authorization: `Bearer ${getToken()}` } },
+        );
+        setSupervisors(await res.json());
+      } finally {
+        setLoadingSupervisors(false);
+      }
+    }
+    loadVendors();
+    loadSupervisors();
   }, []);
 
-  const siteOptions   = sites.map((s) => ({ value: s.id, label: s.name }));
-  const vendorOptions = vendors.map((v) => ({ value: v.id, label: v.name }));
+  const siteOptions       = sites.map((s) => ({ value: s.id, label: s.name }));
+  const vendorOptions     = vendors.map((v) => ({ value: v.id, label: v.name }));
+  const supervisorOptions = supervisors.map((s) => ({ value: s.id, label: s.name }));
 
   const canDownload = !!dateFrom && !!dateTo;
 
@@ -118,14 +129,15 @@ export function ReportDownload() {
     setDownloading(true);
     try {
       const params = new URLSearchParams();
-      if (siteId)   params.set('siteId',   siteId);
-      if (vendorId) params.set('vendorId', vendorId);
-      if (status)   params.set('status',   status);
-      if (dateFrom) params.set('dateFrom', dateFrom);
-      if (dateTo)   params.set('dateTo',   dateTo);
+      if (siteId)       params.set('siteId',       siteId);
+      if (vendorId)     params.set('vendorId',     vendorId);
+      if (supervisorId) params.set('supervisorId', supervisorId);
+      if (status)       params.set('status',       status);
+      if (dateFrom)     params.set('dateFrom',     dateFrom);
+      if (dateTo)       params.set('dateTo',       dateTo);
 
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/reports/invoices?${params}`,
+        `${process.env.NEXT_PUBLIC_API_URL}/reports/combined?${params}`,
         { headers: { Authorization: `Bearer ${getToken()}` } },
       );
 
@@ -135,11 +147,11 @@ export function ReportDownload() {
         return;
       }
 
-      const blob = await res.blob();
-      const url  = URL.createObjectURL(blob);
-      const a    = document.createElement('a');
-      a.href     = url;
-      a.download = `invoices-${dateFrom}-to-${dateTo}.xlsx`;
+      const blob     = await res.blob();
+      const url      = URL.createObjectURL(blob);
+      const a        = document.createElement('a');
+      a.href         = url;
+      a.download     = `report-${dateFrom}-to-${dateTo}.xlsx`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -151,11 +163,18 @@ export function ReportDownload() {
     }
   }
 
+  const summaryParts = [
+    siteId       ? sites.find((s) => s.id === siteId)?.name              : 'All sites',
+    supervisorId ? supervisors.find((s) => s.id === supervisorId)?.name  : 'All supervisors',
+    vendorId     ? vendors.find((v) => v.id === vendorId)?.name          : 'All vendors',
+    status       ? status.charAt(0).toUpperCase() + status.slice(1)      : 'All statuses',
+  ];
+
   return (
     <div>
       <PageHeader
         title="Reports"
-        subtitle="Filter and download invoice reports as Excel"
+        subtitle="Filter and download a combined bills & invoices report as Excel"
       />
 
       <div className="card p-7" style={{ maxWidth: '560px' }}>
@@ -176,10 +195,18 @@ export function ReportDownload() {
               />
               <ClearableSelect
                 label="Site Supervisor"
+                value={supervisorId}
+                onChange={setSupervisorId}
+                options={supervisorOptions}
+                placeholder="All supervisors"
+                loading={loadingSupervisors}
+              />
+              <ClearableSelect
+                label="Vendor"
                 value={vendorId}
                 onChange={setVendorId}
                 options={vendorOptions}
-                placeholder="All supervisors"
+                placeholder="All vendors"
                 loading={loadingVendors}
               />
               <ClearableSelect
@@ -187,10 +214,10 @@ export function ReportDownload() {
                 value={status}
                 onChange={setStatus}
                 options={[
-                  { value: 'pending',  label: 'Pending' },
+                  { value: 'pending',  label: 'Pending'  },
                   { value: 'approved', label: 'Approved' },
                   { value: 'rejected', label: 'Rejected' },
-                  { value: 'paid',     label: 'Paid' },
+                  { value: 'paid',     label: 'Paid'     },
                 ]}
                 placeholder="All statuses"
               />
@@ -202,8 +229,6 @@ export function ReportDownload() {
             <p className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: 'var(--text-muted)' }}>
               Date Range
             </p>
-
-            {/* Preset pills */}
             <div className="flex gap-2 flex-wrap mb-4">
               {PRESETS.map((p) => (
                 <button
@@ -213,7 +238,7 @@ export function ReportDownload() {
                   className="px-3 py-1.5 rounded-lg text-sm font-medium transition-all cursor-pointer"
                   style={{
                     background: preset === p.value ? 'var(--navy)' : 'var(--paper)',
-                    color:      preset === p.value ? '#fff' : 'var(--text-secondary)',
+                    color:      preset === p.value ? '#fff'        : 'var(--text-secondary)',
                     border:     `1.5px solid ${preset === p.value ? 'var(--navy)' : 'var(--border)'}`,
                   }}
                 >
@@ -221,8 +246,6 @@ export function ReportDownload() {
                 </button>
               ))}
             </div>
-
-            {/* Date inputs */}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
@@ -256,13 +279,9 @@ export function ReportDownload() {
           )}
 
           {/* ── Download ─────────────────────────────────── */}
-          <div className="flex items-center justify-between pt-1" style={{ borderTop: '1px solid var(--border)' }}>
+          <div className="flex items-center justify-between gap-6 pt-4" style={{ borderTop: '1px solid var(--border)' }}>
             <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-              {[
-                siteId   ? sites.find((s) => s.id === siteId)?.name     : 'All sites',
-                vendorId ? vendors.find((v) => v.id === vendorId)?.name  : 'All supervisors',
-                status   ? status.charAt(0).toUpperCase() + status.slice(1) : 'All statuses',
-              ].join(' · ')}
+              {summaryParts.join(' · ')}
               {dateFrom && ` · ${dateFrom} → ${dateTo}`}
             </p>
             <Button

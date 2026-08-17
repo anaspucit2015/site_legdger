@@ -14,6 +14,368 @@ export class ReportsService {
     });
   }
 
+  async getSupervisors() {
+    return this.prisma.user.findMany({
+      where: { role: 'site_supervisor' },
+      select: { id: true, name: true },
+      orderBy: { name: 'asc' },
+    });
+  }
+
+  async generateCombinedReport(filters: {
+    siteId?: string;
+    vendorId?: string;
+    supervisorId?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    status?: string;
+  }): Promise<ExcelJS.Buffer> {
+    const from = filters.dateFrom ? new Date(filters.dateFrom) : undefined;
+    const to   = filters.dateTo
+      ? new Date(new Date(filters.dateTo).setHours(23, 59, 59, 999))
+      : undefined;
+
+    const dateFilter = (from || to) ? {
+      submittedAt: {
+        ...(from && { gte: from }),
+        ...(to   && { lte: to }),
+      },
+    } : {};
+
+    const [bills, invoices] = await Promise.all([
+      this.prisma.bill.findMany({
+        where: {
+          ...(filters.siteId       && { siteId:       filters.siteId }),
+          ...(filters.vendorId     && { vendorId:     filters.vendorId }),
+          ...(filters.supervisorId && { submittedById: filters.supervisorId }),
+          ...(filters.status       && { status:       filters.status as any }),
+          ...dateFilter,
+        },
+        include: {
+          site:        true,
+          submittedBy: { select: { name: true } },
+          lineItems:   { include: { task: { select: { name: true } } } },
+        },
+        orderBy: { submittedAt: 'desc' },
+      }),
+      this.prisma.invoice.findMany({
+        where: {
+          ...(filters.siteId   && { siteId:   filters.siteId }),
+          ...(filters.vendorId && { vendorId: filters.vendorId }),
+          ...(filters.status   && { status:   filters.status as any }),
+          ...dateFilter,
+        },
+        include: { task: true, site: true },
+        orderBy: { submittedAt: 'desc' },
+      }),
+    ]);
+
+    const allVendorIds = [
+      ...new Set([
+        ...bills.map((b) => b.vendorId),
+        ...invoices.map((i) => i.vendorId),
+      ].filter(Boolean)),
+    ] as string[];
+    const vendors   = await this.prisma.vendor.findMany({ where: { id: { in: allVendorIds } }, select: { id: true, name: true } });
+    const vendorMap = Object.fromEntries(vendors.map((v) => [v.id, v.name]));
+
+    const workbook   = new ExcelJS.Workbook();
+    workbook.creator = 'SiteLedger';
+    workbook.created = new Date();
+
+    const navyFill: ExcelJS.Fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1B2A4A' } };
+    const navyFont: Partial<ExcelJS.Font> = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+    const boldFont: Partial<ExcelJS.Font> = { bold: true };
+    const statusColours: Record<string, string> = {
+      pending: 'FFFFF3CD', approved: 'FFD1ECF1', rejected: 'FFFDE8E8', paid: 'FFD4EDDA',
+    };
+
+    // ── Sheet 1: Bills ────────────────────────────────────────────────────────
+    const bill_sheet = workbook.addWorksheet('Bills', { pageSetup: { orientation: 'landscape', fitToPage: true } });
+    bill_sheet.columns = [
+      { header: 'Bill #',           key: 'billNum',     width: 14 },
+      { header: 'Site',             key: 'site',        width: 22 },
+      { header: 'Vendor',           key: 'vendor',      width: 22 },
+      { header: 'Supervisor',       key: 'supervisor',  width: 22 },
+      { header: 'Task Name',        key: 'taskName',    width: 28 },
+      { header: 'Unit',             key: 'unit',        width: 10 },
+      { header: 'Qty',              key: 'qty',         width: 10 },
+      { header: 'Rate (PKR)',       key: 'rate',        width: 14 },
+      { header: 'Amount (PKR)',     key: 'amount',      width: 16 },
+      { header: 'Bill Total (PKR)', key: 'billTotal',   width: 16 },
+      { header: 'Status',           key: 'status',      width: 12 },
+      { header: 'Submitted',        key: 'submittedAt', width: 14 },
+      { header: 'Approved',         key: 'approvedAt',  width: 14 },
+      { header: 'Paid',             key: 'paidAt',      width: 14 },
+      { header: 'Payment Ref',      key: 'paymentRef',  width: 22 },
+    ];
+    bill_sheet.getRow(1).eachCell((cell) => {
+      cell.fill = navyFill; cell.font = navyFont;
+      cell.alignment = { vertical: 'middle', horizontal: 'center' };
+      cell.border = { bottom: { style: 'thin', color: { argb: 'FFE8A33D' } } };
+    });
+    bill_sheet.getRow(1).height = 22;
+
+    let billRowIdx = 0;
+    let billGrandTotal = 0;
+    for (const bill of bills) {
+      const billNum    = `BILL-${String(bill.billNumber).padStart(5, '0')}`;
+      const siteName   = bill.site?.name ?? '—';
+      const vendorName = bill.vendorId ? (vendorMap[bill.vendorId] ?? '—') : '—';
+      const supName    = bill.submittedBy?.name ?? '—';
+      const billTotal  = Number(bill.totalAmount);
+      for (const li of bill.lineItems) {
+        const rowBg = billRowIdx % 2 === 0 ? 'FFF8F9FA' : 'FFFFFFFF';
+        const row = bill_sheet.addRow({
+          billNum, site: siteName, vendor: vendorName, supervisor: supName,
+          taskName:    li.task?.name ?? li.customTaskName ?? '—',
+          unit:        li.unit,
+          qty:         Number(li.quantity),
+          rate:        li.unitCostSnapshot ? Number(li.unitCostSnapshot) : '',
+          amount:      Number(li.amount),
+          billTotal,
+          status:      bill.status,
+          submittedAt: bill.submittedAt ? new Date(bill.submittedAt).toLocaleDateString('en-PK') : '',
+          approvedAt:  bill.approvedAt  ? new Date(bill.approvedAt).toLocaleDateString('en-PK')  : '',
+          paidAt:      bill.paidAt      ? new Date(bill.paidAt).toLocaleDateString('en-PK')      : '',
+          paymentRef:  bill.paymentRef  ?? '',
+        });
+        row.eachCell({ includeEmpty: true }, (cell) => { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowBg } }; cell.alignment = { vertical: 'middle' }; });
+        const sc = row.getCell('status');
+        sc.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: statusColours[bill.status] ?? rowBg } };
+        sc.font = boldFont; sc.alignment = { horizontal: 'center', vertical: 'middle' };
+        row.getCell('qty').alignment       = { horizontal: 'right', vertical: 'middle' };
+        row.getCell('rate').alignment      = { horizontal: 'right', vertical: 'middle' };
+        row.getCell('amount').alignment    = { horizontal: 'right', vertical: 'middle' };
+        row.getCell('amount').font         = boldFont;
+        row.getCell('billTotal').alignment = { horizontal: 'right', vertical: 'middle' };
+        billRowIdx++;
+      }
+      billGrandTotal += billTotal;
+    }
+    if (bills.length === 0) {
+      bill_sheet.addRow({ billNum: '—', site: 'No bills found for selected filters.' });
+    } else {
+      const tr = bill_sheet.addRow({ site: 'TOTAL', billTotal: billGrandTotal });
+      tr.getCell('site').font = boldFont; tr.getCell('billTotal').font = boldFont;
+      tr.getCell('billTotal').alignment = { horizontal: 'right', vertical: 'middle' };
+      tr.getCell('site').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8F4F8' } };
+    }
+    bill_sheet.views = [{ state: 'frozen', ySplit: 1 }];
+
+    // ── Sheet 2: Invoices ─────────────────────────────────────────────────────
+    const inv_sheet = workbook.addWorksheet('Invoices', { pageSetup: { orientation: 'landscape', fitToPage: true } });
+    inv_sheet.columns = [
+      { header: 'Invoice #',        key: 'num',         width: 14 },
+      { header: 'Site',             key: 'site',        width: 22 },
+      { header: 'Vendor',           key: 'vendor',      width: 22 },
+      { header: 'Task',             key: 'task',        width: 26 },
+      { header: 'Unit',             key: 'unit',        width: 10 },
+      { header: 'Quantity',         key: 'quantity',    width: 12 },
+      { header: 'Unit Cost (PKR)',  key: 'unitCost',    width: 16 },
+      { header: 'Amount (PKR)',     key: 'amount',      width: 16 },
+      { header: 'Status',           key: 'status',      width: 12 },
+      { header: 'Submitted',        key: 'submittedAt', width: 14 },
+      { header: 'Approved',         key: 'approvedAt',  width: 14 },
+      { header: 'Paid',             key: 'paidAt',      width: 14 },
+      { header: 'Payment Ref',      key: 'paymentRef',  width: 22 },
+    ];
+    inv_sheet.getRow(1).eachCell((cell) => {
+      cell.fill = navyFill; cell.font = navyFont;
+      cell.alignment = { vertical: 'middle', horizontal: 'center' };
+      cell.border = { bottom: { style: 'thin', color: { argb: 'FFE8A33D' } } };
+    });
+    inv_sheet.getRow(1).height = 22;
+
+    invoices.forEach((inv, idx) => {
+      const rowBg = idx % 2 === 0 ? 'FFF8F9FA' : 'FFFFFFFF';
+      const row = inv_sheet.addRow({
+        num:         `INV-${String(inv.invoiceNumber).padStart(5, '0')}`,
+        site:        inv.site?.name ?? '—',
+        vendor:      inv.vendorId ? (vendorMap[inv.vendorId] ?? '—') : '—',
+        task:        inv.task?.name ?? inv.customTaskName ?? '—',
+        unit:        inv.unit,
+        quantity:    Number(inv.quantity),
+        unitCost:    inv.unitCostSnapshot ? Number(inv.unitCostSnapshot) : '',
+        amount:      Number(inv.amount),
+        status:      inv.status,
+        submittedAt: inv.submittedAt ? new Date(inv.submittedAt).toLocaleDateString('en-PK') : '',
+        approvedAt:  inv.approvedAt  ? new Date(inv.approvedAt).toLocaleDateString('en-PK')  : '',
+        paidAt:      inv.paidAt      ? new Date(inv.paidAt).toLocaleDateString('en-PK')      : '',
+        paymentRef:  inv.paymentRef  ?? '',
+      });
+      row.eachCell({ includeEmpty: true }, (cell) => { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowBg } }; cell.alignment = { vertical: 'middle' }; });
+      const sc = row.getCell('status');
+      sc.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: statusColours[inv.status] ?? rowBg } };
+      sc.font = boldFont; sc.alignment = { horizontal: 'center', vertical: 'middle' };
+      row.getCell('quantity').alignment = { horizontal: 'right', vertical: 'middle' };
+      row.getCell('unitCost').alignment = { horizontal: 'right', vertical: 'middle' };
+      row.getCell('amount').alignment   = { horizontal: 'right', vertical: 'middle' };
+      row.getCell('amount').font        = boldFont;
+    });
+    if (invoices.length === 0) {
+      inv_sheet.addRow({ num: '—', site: 'No invoices found for selected filters.' });
+    } else {
+      const tr = inv_sheet.addRow({ site: 'TOTAL', amount: invoices.reduce((s, i) => s + Number(i.amount), 0) });
+      tr.getCell('site').font = boldFont; tr.getCell('amount').font = boldFont;
+      tr.getCell('amount').alignment = { horizontal: 'right', vertical: 'middle' };
+      tr.getCell('site').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8F4F8' } };
+    }
+    inv_sheet.views = [{ state: 'frozen', ySplit: 1 }];
+
+    return workbook.xlsx.writeBuffer();
+  }
+
+  async generateBillReport(filters: {
+    siteId?: string;
+    vendorId?: string;
+    supervisorId?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    status?: string;
+  }): Promise<ExcelJS.Buffer> {
+    const from = filters.dateFrom ? new Date(filters.dateFrom) : undefined;
+    const to   = filters.dateTo
+      ? new Date(new Date(filters.dateTo).setHours(23, 59, 59, 999))
+      : undefined;
+
+    const bills = await this.prisma.bill.findMany({
+      where: {
+        ...(filters.siteId       && { siteId:       filters.siteId }),
+        ...(filters.vendorId     && { vendorId:     filters.vendorId }),
+        ...(filters.supervisorId && { submittedById: filters.supervisorId }),
+        ...(filters.status       && { status:       filters.status as any }),
+        ...((from || to) && {
+          submittedAt: {
+            ...(from && { gte: from }),
+            ...(to   && { lte: to }),
+          },
+        }),
+      },
+      include: {
+        site:        true,
+        submittedBy: { select: { name: true } },
+        lineItems:   { include: { task: { select: { name: true } } } },
+      },
+      orderBy: { submittedAt: 'desc' },
+    });
+
+    if (bills.length === 0) {
+      throw new NotFoundException('No bills found for the selected filters.');
+    }
+
+    const vendorIds = [...new Set(bills.map((b) => b.vendorId).filter(Boolean))] as string[];
+    const vendors   = await this.prisma.vendor.findMany({
+      where: { id: { in: vendorIds } },
+      select: { id: true, name: true },
+    });
+    const vendorMap = Object.fromEntries(vendors.map((v) => [v.id, v.name]));
+
+    const workbook   = new ExcelJS.Workbook();
+    workbook.creator = 'SiteLedger';
+    workbook.created = new Date();
+
+    const sheet = workbook.addWorksheet('Bills', {
+      pageSetup: { orientation: 'landscape', fitToPage: true },
+    });
+
+    const navyFill: ExcelJS.Fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1B2A4A' } };
+    const navyFont: Partial<ExcelJS.Font> = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+    const statusColours: Record<string, string> = {
+      pending: 'FFFFF3CD', approved: 'FFD1ECF1', rejected: 'FFFDE8E8', paid: 'FFD4EDDA',
+    };
+
+    sheet.columns = [
+      { header: 'Bill #',          key: 'billNum',     width: 14 },
+      { header: 'Site',            key: 'site',        width: 22 },
+      { header: 'Vendor',          key: 'vendor',      width: 22 },
+      { header: 'Supervisor',      key: 'supervisor',  width: 22 },
+      { header: 'Task Name',       key: 'taskName',    width: 28 },
+      { header: 'Unit',            key: 'unit',        width: 10 },
+      { header: 'Qty',             key: 'qty',         width: 10 },
+      { header: 'Rate (PKR)',      key: 'rate',        width: 14 },
+      { header: 'Amount (PKR)',    key: 'amount',      width: 16 },
+      { header: 'Bill Total (PKR)',key: 'billTotal',   width: 16 },
+      { header: 'Status',          key: 'status',      width: 12 },
+      { header: 'Submitted',       key: 'submittedAt', width: 14 },
+      { header: 'Approved',        key: 'approvedAt',  width: 14 },
+      { header: 'Paid',            key: 'paidAt',      width: 14 },
+      { header: 'Payment Ref',     key: 'paymentRef',  width: 22 },
+    ];
+
+    sheet.getRow(1).eachCell((cell) => {
+      cell.fill = navyFill;
+      cell.font = navyFont;
+      cell.alignment = { vertical: 'middle', horizontal: 'center' };
+      cell.border = { bottom: { style: 'thin', color: { argb: 'FFE8A33D' } } };
+    });
+    sheet.getRow(1).height = 22;
+
+    let rowIdx = 0;
+    let grandTotal = 0;
+
+    for (const bill of bills) {
+      const billNum    = `BILL-${String(bill.billNumber).padStart(5, '0')}`;
+      const siteName   = bill.site?.name ?? '—';
+      const vendorName = bill.vendorId ? (vendorMap[bill.vendorId] ?? '—') : '—';
+      const supName    = bill.submittedBy?.name ?? '—';
+      const billTotal  = Number(bill.totalAmount);
+
+      for (const li of bill.lineItems) {
+        const taskName = li.task?.name ?? li.customTaskName ?? '—';
+        const rowBg    = rowIdx % 2 === 0 ? 'FFF8F9FA' : 'FFFFFFFF';
+
+        const row = sheet.addRow({
+          billNum,
+          site:        siteName,
+          vendor:      vendorName,
+          supervisor:  supName,
+          taskName,
+          unit:        li.unit,
+          qty:         Number(li.quantity),
+          rate:        li.unitCostSnapshot ? Number(li.unitCostSnapshot) : '',
+          amount:      Number(li.amount),
+          billTotal,
+          status:      bill.status,
+          submittedAt: bill.submittedAt ? new Date(bill.submittedAt).toLocaleDateString('en-PK') : '',
+          approvedAt:  bill.approvedAt  ? new Date(bill.approvedAt).toLocaleDateString('en-PK')  : '',
+          paidAt:      bill.paidAt      ? new Date(bill.paidAt).toLocaleDateString('en-PK')      : '',
+          paymentRef:  bill.paymentRef  ?? '',
+        });
+
+        row.eachCell({ includeEmpty: true }, (cell) => {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowBg } };
+          cell.alignment = { vertical: 'middle' };
+        });
+
+        const sc = row.getCell('status');
+        sc.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: statusColours[bill.status] ?? rowBg } };
+        sc.font = { bold: true };
+        sc.alignment = { horizontal: 'center', vertical: 'middle' };
+
+        row.getCell('qty').alignment       = { horizontal: 'right', vertical: 'middle' };
+        row.getCell('rate').alignment      = { horizontal: 'right', vertical: 'middle' };
+        row.getCell('amount').alignment    = { horizontal: 'right', vertical: 'middle' };
+        row.getCell('amount').font         = { bold: true };
+        row.getCell('billTotal').alignment = { horizontal: 'right', vertical: 'middle' };
+
+        rowIdx++;
+      }
+
+      grandTotal += billTotal;
+    }
+
+    const totalRow = sheet.addRow({ site: 'TOTAL', billTotal: grandTotal });
+    totalRow.getCell('site').font      = { bold: true };
+    totalRow.getCell('billTotal').font = { bold: true };
+    totalRow.getCell('billTotal').alignment = { horizontal: 'right', vertical: 'middle' };
+    totalRow.getCell('site').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8F4F8' } };
+
+    sheet.views = [{ state: 'frozen', ySplit: 1 }];
+
+    return workbook.xlsx.writeBuffer();
+  }
+
   async generateBalanceReport(filter: {
     siteId?: string;
     vendorId?: string;
