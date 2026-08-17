@@ -11,20 +11,28 @@ import { Plus } from 'lucide-react';
 export default function AdminSitesPage() {
   const [page, setPage] = useState(1);
   const { data: result, isLoading } = useGetSitesQuery({ page });
-  const sites = result?.data ?? [];
-  const total = result?.total ?? 0;
+  const allSites = result?.data ?? [];
+  const total    = result?.total ?? 0;
   const [createSite, { isLoading: creating }] = useCreateSiteMutation();
   const [deactivate] = useDeactivateSiteMutation();
+  const [filter, setFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const sites = allSites.filter((s) =>
+    filter === 'all' ? true : filter === 'active' ? s.isActive : !s.isActive,
+  );
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ name: '', location: '' });
+  const [form, setForm] = useState({ name: '', location: '', currentBalance: '' });
   const [error, setError] = useState('');
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     setError('');
     try {
-      await createSite(form).unwrap();
-      setForm({ name: '', location: '' });
+      await createSite({
+        name: form.name,
+        location: form.location,
+        ...(form.currentBalance ? { currentBalance: Number(form.currentBalance) } : {}),
+      }).unwrap();
+      setForm({ name: '', location: '', currentBalance: '' });
       setShowForm(false);
     } catch {
       setError('Failed to create site');
@@ -37,9 +45,31 @@ export default function AdminSitesPage() {
         title="Sites"
         subtitle="Manage construction sites"
         action={
-          <Button onClick={() => setShowForm(true)}>
-            <Plus size={15} /> Add Site
-          </Button>
+          <div className="flex gap-2">
+            <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'var(--border)' }}>
+              {(['all', 'active', 'inactive'] as const).map((f) => {
+                const active = filter === f;
+                return (
+                  <button
+                    key={f}
+                    onClick={() => setFilter(f)}
+                    className="px-4 py-2 rounded-lg text-sm font-medium capitalize transition-all cursor-pointer"
+                    style={{
+                      background: active ? 'white' : 'transparent',
+                      color:      active ? 'var(--navy)' : 'var(--text-muted)',
+                      boxShadow:  active ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                      fontFamily: 'var(--font-body)',
+                    }}
+                  >
+                    {f}
+                  </button>
+                );
+              })}
+            </div>
+            <Button onClick={() => setShowForm(true)}>
+              <Plus size={15} /> Add Site
+            </Button>
+          </div>
         }
       />
 
@@ -97,6 +127,15 @@ export default function AdminSitesPage() {
             required
             value={form.location}
             onChange={(e) => setForm({ ...form, location: e.target.value })}
+          />
+          <Input
+            label="Current Balance (PKR) — optional"
+            type="number"
+            min="0"
+            step="0.01"
+            placeholder="0"
+            value={form.currentBalance}
+            onChange={(e) => setForm({ ...form, currentBalance: e.target.value })}
           />
           {error && <p className="text-sm" style={{ color: 'var(--rust)' }}>{error}</p>}
           <div className="flex gap-3 justify-end pt-2">

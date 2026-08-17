@@ -30,9 +30,9 @@ export const sitesApi = baseApi.injectEndpoints({
       query: (body) => ({ url: '/sites', method: 'POST', body }),
       invalidatesTags: ['Site'],
     }),
-    updateSite: build.mutation<Site, { id: string; name?: string; location?: string; isActive?: boolean }>({
+    updateSite: build.mutation<Site, { id: string; name?: string; location?: string; currentBalance?: number; isActive?: boolean }>({
       query: ({ id, ...body }) => ({ url: `/sites/${id}`, method: 'PATCH', body }),
-      invalidatesTags: ['Site'],
+      invalidatesTags: ['Site', 'Invoice'],
     }),
     deactivateSite: build.mutation<Site, string>({
       query: (id) => ({ url: `/sites/${id}`, method: 'DELETE' }),

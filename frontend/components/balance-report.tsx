@@ -8,8 +8,8 @@ import {
 import {
   useGetBillsQuery, useApproveBillMutation, useRejectBillMutation, Bill,
 } from '@/lib/api/billsApi';
-import { useGetActiveSitesQuery } from '@/lib/api/sitesApi';
-import { useGetActiveVendorsQuery } from '@/lib/api/vendorsApi';
+import { useGetActiveSitesQuery, useUpdateSiteMutation } from '@/lib/api/sitesApi';
+import { useGetActiveVendorsQuery, useUpdateVendorMutation } from '@/lib/api/vendorsApi';
 import { StatusStamp } from '@/components/status-stamp';
 import { InvoiceDetailModal } from '@/components/invoice-detail-modal';
 import { BillDetailModal } from '@/components/bill-detail-modal';
@@ -17,7 +17,7 @@ import {
   SearchableSelect, Table, THead, TBody, Th, Tr, Td, TableEmpty, TableLoading,
   Pagination, PageHeader, Button, Modal, Textarea, Select,
 } from '@/components/ui';
-import { Eye, TrendingDown, CheckCircle, Clock, XCircle, Check, X, Download, FileText, ReceiptText } from 'lucide-react';
+import { Eye, TrendingDown, CheckCircle, Clock, XCircle, Check, X, Download, FileText, ReceiptText, Pencil } from 'lucide-react';
 import { getToken } from '@/lib/auth';
 
 type Props = { type: 'site' | 'vendor' };
@@ -62,10 +62,10 @@ function SummaryCard({
   );
 }
 
-function StatusCards({ s, unit }: { s: BalanceSubSummary; unit?: string }) {
+function StatusCards({ s, unit, currentBalance }: { s: BalanceSubSummary; unit?: string; currentBalance?: number }) {
   return (
     <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-      <SummaryCard label="Paid"     amount={s.paidAmount}     count={s.paidCount}     color="#1E6E49" bg="#EDF7F2" icon={CheckCircle} unit={unit} />
+      <SummaryCard label="Paid"     amount={s.paidAmount + (currentBalance ?? 0)} count={s.paidCount} color="#1E6E49" bg="#EDF7F2" icon={CheckCircle} unit={unit} />
       <SummaryCard label="Approved" amount={s.approvedAmount} count={s.approvedCount} color="#1B3A5C" bg="#EEF2F7" icon={TrendingDown} unit={unit} />
       <SummaryCard label="Pending"  amount={s.pendingAmount}  count={s.pendingCount}  color="#B87A1A" bg="#FFF8EC" icon={Clock}        unit={unit} />
       <SummaryCard label="Rejected" amount={s.rejectedAmount} count={s.rejectedCount} color="#C0392B" bg="#FDF0EF" icon={XCircle}      unit={unit} />
@@ -99,12 +99,18 @@ export function BalanceReport({ type }: Props) {
   const [downloading,   setDownloading]   = useState(false);
   const [downloadError, setDownloadError] = useState('');
 
+  const [editBalanceOpen,   setEditBalanceOpen]   = useState(false);
+  const [editBalanceValue,  setEditBalanceValue]  = useState('');
+  const [editBalanceSaving, setEditBalanceSaving] = useState(false);
+
   const { data: sites   = [] } = useGetActiveSitesQuery();
   const { data: vendors = [] } = useGetActiveVendorsQuery();
   const [approveInv] = useApproveInvoiceMutation();
   const [rejectInv]  = useRejectInvoiceMutation();
   const [approveBill] = useApproveBillMutation();
   const [rejectBillMut] = useRejectBillMutation();
+  const [updateSite]   = useUpdateSiteMutation();
+  const [updateVendor] = useUpdateVendorMutation();
 
   const options =
     type === 'site'
@@ -190,6 +196,22 @@ export function BalanceReport({ type }: Props) {
     }
   }
 
+  async function handleSaveBalance() {
+    const val = parseFloat(editBalanceValue);
+    if (isNaN(val) || val < 0) return;
+    setEditBalanceSaving(true);
+    try {
+      if (type === 'site') {
+        await updateSite({ id: selectedId, currentBalance: val });
+      } else {
+        await updateVendor({ id: selectedId, currentBalance: val });
+      }
+      setEditBalanceOpen(false);
+    } finally {
+      setEditBalanceSaving(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -232,26 +254,45 @@ export function BalanceReport({ type }: Props) {
                   </p>
                   <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>
                     {balance.invoices.totalCount} invoice{balance.invoices.totalCount !== 1 ? 's' : ''} · {balance.bills.totalCount} bill{balance.bills.totalCount !== 1 ? 's' : ''}
+                    {balance.currentBalance > 0 && ` · ${fmt(balance.currentBalance)} current balance`}
                   </p>
                 </div>
                 <div className="shrink-0 flex flex-col items-end gap-2">
-                  <button
-                    type="button"
-                    onClick={handleDownload}
-                    disabled={downloading}
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all"
-                    style={{
-                      background: downloading ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.15)',
-                      color: 'white',
-                      border: '1.5px solid rgba(255,255,255,0.25)',
-                      cursor: downloading ? 'not-allowed' : 'pointer',
-                    }}
-                    onMouseEnter={(e) => { if (!downloading) e.currentTarget.style.background = 'rgba(255,255,255,0.22)'; }}
-                    onMouseLeave={(e) => { if (!downloading) e.currentTarget.style.background = 'rgba(255,255,255,0.15)'; }}
-                  >
-                    <Download size={14} />
-                    {downloading ? 'Generating…' : 'Download Report'}
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => { setEditBalanceValue(String(balance.currentBalance)); setEditBalanceOpen(true); }}
+                      className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all"
+                      style={{
+                        background: 'rgba(255,255,255,0.1)',
+                        color: 'white',
+                        border: '1.5px solid rgba(255,255,255,0.2)',
+                        cursor: 'pointer',
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.18)'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; }}
+                    >
+                      <Pencil size={13} />
+                      Edit Balance
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDownload}
+                      disabled={downloading}
+                      className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all"
+                      style={{
+                        background: downloading ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.15)',
+                        color: 'white',
+                        border: '1.5px solid rgba(255,255,255,0.25)',
+                        cursor: downloading ? 'not-allowed' : 'pointer',
+                      }}
+                      onMouseEnter={(e) => { if (!downloading) e.currentTarget.style.background = 'rgba(255,255,255,0.22)'; }}
+                      onMouseLeave={(e) => { if (!downloading) e.currentTarget.style.background = 'rgba(255,255,255,0.15)'; }}
+                    >
+                      <Download size={14} />
+                      {downloading ? 'Generating…' : 'Download Report'}
+                    </button>
+                  </div>
                   {downloadError && (
                     <p className="text-xs" style={{ color: '#ffb3b3' }}>{downloadError}</p>
                   )}
@@ -287,7 +328,7 @@ export function BalanceReport({ type }: Props) {
               {/* ── Invoices: cards + table ───────────────────────────────── */}
               {activeTab === 'invoices' && (
                 <div className="space-y-4">
-                  <StatusCards s={balance.invoices} unit="invoice" />
+                  <StatusCards s={balance.invoices} unit="invoice" currentBalance={balance.currentBalance} />
                   {invoicesLoading ? (
                     <TableLoading />
                   ) : invoices.length === 0 ? (
@@ -499,6 +540,44 @@ export function BalanceReport({ type }: Props) {
             <Button variant="danger" loading={!!invRejectingId} disabled={!invRejReason} onClick={handleInvRejectSubmit}>
               Confirm Reject
             </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Edit current balance modal */}
+      <Modal
+        open={editBalanceOpen}
+        onClose={() => setEditBalanceOpen(false)}
+        title="Edit Current Balance"
+        subtitle={`Update the opening / existing balance for ${selectedLabel ?? ''}`}
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+              Current Balance (PKR)
+            </label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="0.00"
+              value={editBalanceValue}
+              onChange={(e) => setEditBalanceValue(e.target.value)}
+              style={{
+                width: '100%', padding: '8px 12px', fontSize: 14,
+                border: '1.5px solid var(--border)', borderRadius: 8,
+                background: 'var(--paper)', color: 'var(--navy)',
+                fontFamily: 'var(--font-mono)', outline: 'none',
+              }}
+              autoFocus
+            />
+            <p className="text-xs mt-1.5" style={{ color: 'var(--text-muted)' }}>
+              This amount is added to the Paid total and Grand Total for this {type}.
+            </p>
+          </div>
+          <div className="flex gap-3 justify-end pt-1">
+            <Button variant="outline" disabled={editBalanceSaving} onClick={() => setEditBalanceOpen(false)}>Cancel</Button>
+            <Button loading={editBalanceSaving} onClick={handleSaveBalance}>Save Balance</Button>
           </div>
         </div>
       </Modal>

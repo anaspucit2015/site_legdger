@@ -21,7 +21,7 @@ export default function AdminVendorsPage() {
   const filtered = vendors.filter((v) =>
     filter === 'all' ? true : filter === 'active' ? v.isActive : !v.isActive,
   );
-  const [form, setForm] = useState({ name: '', contactPerson: '', phone: '', email: '', address: '' });
+  const [form, setForm] = useState({ name: '', contactPerson: '', phone: '', email: '', address: '', currentBalance: '' });
   const [error, setError] = useState('');
 
   async function handleCreate(e: React.FormEvent) {
@@ -33,9 +33,10 @@ export default function AdminVendorsPage() {
         contactPerson: form.contactPerson,
         phone: form.phone,
         address: form.address,
-        ...(form.email ? { email: form.email } : {}),
+        ...(form.email           ? { email: form.email }                                      : {}),
+        ...(form.currentBalance  ? { currentBalance: Number(form.currentBalance) }            : {}),
       }).unwrap();
-      setForm({ name: '', contactPerson: '', phone: '', email: '', address: '' });
+      setForm({ name: '', contactPerson: '', phone: '', email: '', address: '', currentBalance: '' });
       setShowForm(false);
     } catch {
       setError('Failed to create vendor');
@@ -154,6 +155,15 @@ export default function AdminVendorsPage() {
             value={form.address}
             onChange={(e) => setForm({ ...form, address: e.target.value })}
             placeholder="e.g. 123 Main St, Lahore"
+          />
+          <Input
+            label="Current Balance (PKR) — optional"
+            type="number"
+            min="0"
+            step="0.01"
+            placeholder="0"
+            value={form.currentBalance}
+            onChange={(e) => setForm({ ...form, currentBalance: e.target.value })}
           />
           {error && <p className="text-sm" style={{ color: 'var(--rust)' }}>{error}</p>}
           <div className="flex gap-3 justify-end pt-2">

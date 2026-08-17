@@ -32,9 +32,9 @@ export const vendorsApi = baseApi.injectEndpoints({
       query: (body) => ({ url: '/vendors', method: 'POST', body }),
       invalidatesTags: ['Vendor'],
     }),
-    updateVendor: build.mutation<Vendor, { id: string; name?: string; contactPerson?: string; phone?: string; email?: string; address?: string; isActive?: boolean }>({
+    updateVendor: build.mutation<Vendor, { id: string; name?: string; contactPerson?: string; phone?: string; email?: string; address?: string; currentBalance?: number; isActive?: boolean }>({
       query: ({ id, ...body }) => ({ url: `/vendors/${id}`, method: 'PATCH', body }),
-      invalidatesTags: ['Vendor'],
+      invalidatesTags: ['Vendor', 'Invoice'],
     }),
     deactivateVendor: build.mutation<Vendor, string>({
       query: (id) => ({ url: `/vendors/${id}`, method: 'DELETE' }),

@@ -35,28 +35,30 @@ model User {
 }
 
 model Vendor {
-  id            String   @id @default(cuid())
-  name          String
-  contactPerson String?
-  phone         String?
-  email         String?
-  address       String?
-  isActive      Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id              String   @id @default(cuid())
+  name            String
+  contactPerson   String?
+  phone           String?
+  email           String?
+  address         String?
+  currentBalance  Decimal  @default(0)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   invoices Invoice[]
   bills    Bill[]
 }
 
 model Site {
-  id        String   @id @default(cuid())
-  siteCode  Int      @unique @default(autoincrement())
-  name      String
-  location  String
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String   @id @default(cuid())
+  siteCode       Int      @unique @default(autoincrement())
+  name           String
+  location       String
+  currentBalance Decimal  @default(0)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   invoices Invoice[]
   bills    Bill[]

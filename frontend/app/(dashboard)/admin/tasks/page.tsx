@@ -11,8 +11,12 @@ import { Plus } from 'lucide-react';
 export default function AdminTasksPage() {
   const [page, setPage] = useState(1);
   const { data: result, isLoading } = useGetTasksQuery({ page });
-  const tasks = (result && 'data' in result ? result.data : result) ?? [];
-  const total = (result && 'total' in result ? result.total : 0) ?? 0;
+  const [filter, setFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const allTasks = (result && 'data' in result ? result.data : result) ?? [];
+  const total    = (result && 'total' in result ? result.total : 0) ?? 0;
+  const tasks    = allTasks.filter((t) =>
+    filter === 'all' ? true : filter === 'active' ? t.isActive : !t.isActive,
+  );
   const [createTask, { isLoading: creating }] = useCreateTaskMutation();
   const [updateTask] = useUpdateTaskMutation();
   const [deactivate] = useDeactivateTaskMutation();
@@ -41,9 +45,31 @@ export default function AdminTasksPage() {
         title="Tasks"
         subtitle="Global task catalogue — available across all sites"
         action={
-          <Button onClick={() => setShowForm(true)}>
-            <Plus size={15} /> Add Task
-          </Button>
+          <div className="flex gap-2">
+            <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'var(--border)' }}>
+              {(['all', 'active', 'inactive'] as const).map((f) => {
+                const active = filter === f;
+                return (
+                  <button
+                    key={f}
+                    onClick={() => setFilter(f)}
+                    className="px-4 py-2 rounded-lg text-sm font-medium capitalize transition-all cursor-pointer"
+                    style={{
+                      background: active ? 'white' : 'transparent',
+                      color:      active ? 'var(--navy)' : 'var(--text-muted)',
+                      boxShadow:  active ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                      fontFamily: 'var(--font-body)',
+                    }}
+                  >
+                    {f}
+                  </button>
+                );
+              })}
+            </div>
+            <Button onClick={() => setShowForm(true)}>
+              <Plus size={15} /> Add Task
+            </Button>
+          </div>
         }
       />
 

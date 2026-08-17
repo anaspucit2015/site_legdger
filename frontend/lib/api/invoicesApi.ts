@@ -16,6 +16,7 @@ export type BalanceSubSummary = {
 };
 
 export type BalanceSummary = BalanceSubSummary & {
+  currentBalance: number;
   invoices: BalanceSubSummary;
   bills:    BalanceSubSummary;
 };

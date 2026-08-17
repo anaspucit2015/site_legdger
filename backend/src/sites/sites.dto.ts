@@ -1,4 +1,4 @@
-import { IsOptional, IsString } from 'class-validator';
+import { IsNumber, IsOptional, IsString, Min } from 'class-validator';
 
 export class CreateSiteDto {
   @IsString()
@@ -6,6 +6,11 @@ export class CreateSiteDto {
 
   @IsString()
   location: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  currentBalance?: number;
 }
 
 export class UpdateSiteDto {
@@ -16,6 +21,11 @@ export class UpdateSiteDto {
   @IsOptional()
   @IsString()
   location?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  currentBalance?: number;
 
   @IsOptional()
   isActive?: boolean;

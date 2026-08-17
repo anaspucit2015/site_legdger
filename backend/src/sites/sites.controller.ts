@@ -20,9 +20,8 @@ import { Roles } from '../common/decorators/roles.decorator';
 export class SitesController {
   constructor(private sitesService: SitesService) {}
 
-  // Admin only — create/edit/deactivate
   @UseGuards(RolesGuard)
-  @Roles('admin')
+  @Roles('admin', 'accountant')
   @Post()
   create(@Body() dto: CreateSiteDto) {
     return this.sitesService.create(dto);
@@ -47,14 +46,14 @@ export class SitesController {
   }
 
   @UseGuards(RolesGuard)
-  @Roles('admin')
+  @Roles('admin', 'accountant')
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: UpdateSiteDto) {
     return this.sitesService.update(id, dto);
   }
 
   @UseGuards(RolesGuard)
-  @Roles('admin')
+  @Roles('admin', 'accountant')
   @Delete(':id')
   deactivate(@Param('id') id: string) {
     return this.sitesService.deactivate(id);

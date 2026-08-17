@@ -261,10 +261,17 @@ export class InvoicesService {
       ...(filter.vendorId && { vendorId: filter.vendorId }),
     };
 
-    const [invoices, bills] = await Promise.all([
+    const [invoices, bills, entity] = await Promise.all([
       this.prisma.invoice.findMany({ where, select: { status: true, amount: true } }),
       this.prisma.bill.findMany({ where, select: { status: true, totalAmount: true } }),
+      filter.siteId
+        ? this.prisma.site.findUnique({ where: { id: filter.siteId }, select: { currentBalance: true } })
+        : filter.vendorId
+          ? this.prisma.vendor.findUnique({ where: { id: filter.vendorId }, select: { currentBalance: true } })
+          : Promise.resolve(null),
     ]);
+
+    const currentBalance = Number(entity?.currentBalance ?? 0);
 
     function tally(rows: { status: string; amount?: any; totalAmount?: any }[]) {
       const s = { totalAmount: 0, paidAmount: 0, approvedAmount: 0, pendingAmount: 0, rejectedAmount: 0,
@@ -284,8 +291,9 @@ export class InvoicesService {
     const bill = tally(bills);
 
     return {
-      totalAmount:    inv.totalAmount    + bill.totalAmount,
-      paidAmount:     inv.paidAmount     + bill.paidAmount,
+      currentBalance,
+      totalAmount:    inv.totalAmount    + bill.totalAmount    + currentBalance,
+      paidAmount:     inv.paidAmount     + bill.paidAmount     + currentBalance,
       approvedAmount: inv.approvedAmount + bill.approvedAmount,
       pendingAmount:  inv.pendingAmount  + bill.pendingAmount,
       rejectedAmount: inv.rejectedAmount + bill.rejectedAmount,

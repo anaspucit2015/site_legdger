@@ -1,4 +1,4 @@
-import { IsOptional, IsString } from 'class-validator';
+import { IsNumber, IsOptional, IsString, Min } from 'class-validator';
 
 export class CreateVendorDto {
   @IsString()
@@ -16,6 +16,11 @@ export class CreateVendorDto {
 
   @IsString()
   address: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  currentBalance?: number;
 }
 
 export class UpdateVendorDto {
@@ -38,6 +43,11 @@ export class UpdateVendorDto {
   @IsOptional()
   @IsString()
   address?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  currentBalance?: number;
 
   @IsOptional()
   isActive?: boolean;
