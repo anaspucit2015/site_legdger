@@ -29,4 +29,7 @@ export class UpdateSiteDto {
 
   @IsOptional()
   isActive?: boolean;
+
+  @IsOptional()
+  isArchived?: boolean;
 }

@@ -3,6 +3,11 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateUserDto, UpdateUserDto } from './users.dto';
 import * as bcrypt from 'bcrypt';
 
+const SELECT = {
+  id: true, name: true, email: true, role: true,
+  isActive: true, isArchived: true, createdAt: true,
+};
+
 @Injectable()
 export class UsersService {
   constructor(private prisma: PrismaService) {}
@@ -12,18 +17,17 @@ export class UsersService {
     if (existing) throw new ConflictException('Email already in use');
 
     const hashed = await bcrypt.hash(dto.password, 10);
-    const user = await this.prisma.user.create({
+    return this.prisma.user.create({
       data: { ...dto, password: hashed },
-      select: { id: true, name: true, email: true, role: true, isActive: true, createdAt: true },
+      select: SELECT,
     });
-    return user;
   }
 
   async findAll(page = 1, limit = 20) {
     const skip = (page - 1) * limit;
     const [data, total] = await Promise.all([
       this.prisma.user.findMany({
-        select: { id: true, name: true, email: true, role: true, isActive: true, createdAt: true },
+        select: SELECT,
         orderBy: { createdAt: 'desc' },
         skip,
         take: limit,
@@ -34,29 +38,23 @@ export class UsersService {
   }
 
   async findOne(id: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id },
-      select: { id: true, name: true, email: true, role: true, isActive: true, createdAt: true },
-    });
+    const user = await this.prisma.user.findUnique({ where: { id }, select: SELECT });
     if (!user) throw new NotFoundException('User not found');
     return user;
   }
 
   async update(id: string, dto: UpdateUserDto) {
     await this.findOne(id);
-    return this.prisma.user.update({
-      where: { id },
-      data: dto,
-      select: { id: true, name: true, email: true, role: true, isActive: true, createdAt: true },
-    });
+    return this.prisma.user.update({ where: { id }, data: dto, select: SELECT });
   }
 
   async deactivate(id: string) {
     await this.findOne(id);
-    return this.prisma.user.update({
-      where: { id },
-      data: { isActive: false },
-      select: { id: true, name: true, email: true, role: true, isActive: true },
-    });
+    return this.prisma.user.update({ where: { id }, data: { isActive: false }, select: SELECT });
+  }
+
+  async archive(id: string) {
+    await this.findOne(id);
+    return this.prisma.user.update({ where: { id }, data: { isArchived: true }, select: SELECT });
   }
 }

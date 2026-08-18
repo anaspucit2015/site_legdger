@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { useGetSitesQuery, useCreateSiteMutation, useDeactivateSiteMutation } from '@/lib/api/sitesApi';
+import { useGetSitesQuery, useCreateSiteMutation, useUpdateSiteMutation, useDeactivateSiteMutation, useArchiveSiteMutation, Site } from '@/lib/api/sitesApi';
 import {
   Button, Input, Modal,
   Table, THead, TBody, Th, Tr, Td, TableLoading,
@@ -8,17 +8,35 @@ import {
 } from '@/components/ui';
 import { Plus } from 'lucide-react';
 
+type Filter = 'all' | 'active' | 'inactive' | 'archived';
+
+function statusBadge(s: Site) {
+  if (s.isArchived) return { label: 'Archived', bg: '#fef3e2', color: '#92400e' };
+  if (s.isActive)   return { label: 'Active',   bg: '#edf7f2', color: '#1e6e49' };
+  return               { label: 'Inactive',  bg: '#f2f2f2', color: '#888'    };
+}
+
 export default function AdminSitesPage() {
   const [page, setPage] = useState(1);
   const { data: result, isLoading } = useGetSitesQuery({ page });
   const allSites = result?.data ?? [];
   const total    = result?.total ?? 0;
+
   const [createSite, { isLoading: creating }] = useCreateSiteMutation();
+  const [updateSite] = useUpdateSiteMutation();
   const [deactivate] = useDeactivateSiteMutation();
-  const [filter, setFilter] = useState<'all' | 'active' | 'inactive'>('all');
-  const sites = allSites.filter((s) =>
-    filter === 'all' ? true : filter === 'active' ? s.isActive : !s.isActive,
-  );
+  const [archiveSite, { isLoading: archiving }] = useArchiveSiteMutation();
+
+  const [filter, setFilter] = useState<Filter>('all');
+  const [archiveTarget, setArchiveTarget] = useState<Site | null>(null);
+
+  const sites = allSites.filter((s) => {
+    if (filter === 'archived') return s.isArchived;
+    if (filter === 'active')   return s.isActive && !s.isArchived;
+    if (filter === 'inactive') return !s.isActive && !s.isArchived;
+    return !s.isArchived; // 'all' hides archived
+  });
+
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ name: '', location: '', currentBalance: '' });
   const [error, setError] = useState('');
@@ -39,6 +57,12 @@ export default function AdminSitesPage() {
     }
   }
 
+  async function handleArchiveConfirm() {
+    if (!archiveTarget) return;
+    await archiveSite(archiveTarget.id);
+    setArchiveTarget(null);
+  }
+
   return (
     <div>
       <PageHeader
@@ -47,7 +71,7 @@ export default function AdminSitesPage() {
         action={
           <div className="flex gap-2">
             <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'var(--border)' }}>
-              {(['all', 'active', 'inactive'] as const).map((f) => {
+              {(['all', 'active', 'inactive', 'archived'] as Filter[]).map((f) => {
                 const active = filter === f;
                 return (
                   <button
@@ -87,33 +111,49 @@ export default function AdminSitesPage() {
             </tr>
           </THead>
           <TBody>
-            {sites.map((s) => (
-              <Tr key={s.id}>
-                <Td mono muted>{`S-${String(s.siteCode).padStart(3, '0')}`}</Td>
-                <Td bold>{s.name}</Td>
-                <Td muted>{s.location}</Td>
-                <Td>
-                  <span
-                    className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold"
-                    style={s.isActive ? { background: '#edf7f2', color: '#1e6e49' } : { background: '#f2f2f2', color: '#888' }}
-                  >
-                    {s.isActive ? 'Active' : 'Inactive'}
-                  </span>
-                </Td>
-                <Td right>
-                  {s.isActive && (
-                    <Button size="sm" variant="ghost" onClick={() => deactivate(s.id)} style={{ color: 'var(--rust)' }}>
-                      Deactivate
-                    </Button>
-                  )}
-                </Td>
-              </Tr>
-            ))}
+            {sites.map((s) => {
+              const badge = statusBadge(s);
+              return (
+                <Tr key={s.id}>
+                  <Td mono muted>{`S-${String(s.siteCode).padStart(3, '0')}`}</Td>
+                  <Td bold>{s.name}</Td>
+                  <Td muted>{s.location}</Td>
+                  <Td>
+                    <span
+                      className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold"
+                      style={{ background: badge.bg, color: badge.color }}
+                    >
+                      {badge.label}
+                    </span>
+                  </Td>
+                  <Td right>
+                    <div className="flex gap-2 justify-end">
+                      {!s.isActive && !s.isArchived && (
+                        <Button size="sm" variant="ghost" onClick={() => updateSite({ id: s.id, isActive: true })} style={{ color: '#1e6e49' }}>
+                          Reactivate
+                        </Button>
+                      )}
+                      {s.isActive && !s.isArchived && (
+                        <Button size="sm" variant="ghost" onClick={() => deactivate(s.id)} style={{ color: 'var(--text-muted)' }}>
+                          Deactivate
+                        </Button>
+                      )}
+                      {!s.isArchived && (
+                        <Button size="sm" variant="ghost" onClick={() => setArchiveTarget(s)} style={{ color: 'var(--rust)' }}>
+                          Archive
+                        </Button>
+                      )}
+                    </div>
+                  </Td>
+                </Tr>
+              );
+            })}
           </TBody>
         </Table>
       )}
       <Pagination page={page} total={total} limit={20} onChange={setPage} />
 
+      {/* Add Site Modal */}
       <Modal open={showForm} onClose={() => setShowForm(false)} title="Add Site">
         <form onSubmit={handleCreate} className="space-y-3">
           <Input
@@ -143,6 +183,29 @@ export default function AdminSitesPage() {
             <Button type="submit" loading={creating}>{creating ? 'Creating…' : 'Create Site'}</Button>
           </div>
         </form>
+      </Modal>
+
+      {/* Archive Confirmation Modal */}
+      <Modal open={!!archiveTarget} onClose={() => setArchiveTarget(null)} title="Archive Site">
+        <div className="space-y-4">
+          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+            Are you sure you want to archive{' '}
+            <span className="font-semibold" style={{ color: 'var(--navy)' }}>{archiveTarget?.name}</span>?
+          </p>
+          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+            Archived sites are hidden from all lists and cannot be selected for new invoices or bills. Their historical data is preserved.
+          </p>
+          <div className="flex gap-3 justify-end pt-1">
+            <Button variant="outline" onClick={() => setArchiveTarget(null)}>Cancel</Button>
+            <Button
+              loading={archiving}
+              onClick={handleArchiveConfirm}
+              style={{ background: 'var(--rust)', color: 'white' }}
+            >
+              {archiving ? 'Archiving…' : 'Archive Site'}
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

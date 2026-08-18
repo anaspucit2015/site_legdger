@@ -21,7 +21,7 @@ export class SitesService {
 
   findActive() {
     return this.prisma.site.findMany({
-      where: { isActive: true },
+      where: { isActive: true, isArchived: false },
       orderBy: { name: 'asc' },
     });
   }
@@ -42,6 +42,14 @@ export class SitesService {
     return this.prisma.site.update({
       where: { id },
       data: { isActive: false },
+    });
+  }
+
+  async archive(id: string) {
+    await this.findOne(id);
+    return this.prisma.site.update({
+      where: { id },
+      data: { isArchived: true },
     });
   }
 }

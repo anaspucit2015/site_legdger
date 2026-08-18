@@ -9,6 +9,7 @@ export type Vendor = {
   email: string | null;
   address: string | null;
   isActive: boolean;
+  isArchived: boolean;
   createdAt: string;
 };
 
@@ -40,6 +41,10 @@ export const vendorsApi = baseApi.injectEndpoints({
       query: (id) => ({ url: `/vendors/${id}`, method: 'DELETE' }),
       invalidatesTags: ['Vendor'],
     }),
+    archiveVendor: build.mutation<Vendor, string>({
+      query: (id) => ({ url: `/vendors/${id}/archive`, method: 'PATCH' }),
+      invalidatesTags: ['Vendor'],
+    }),
   }),
 });
 
@@ -49,4 +54,5 @@ export const {
   useCreateVendorMutation,
   useUpdateVendorMutation,
   useDeactivateVendorMutation,
+  useArchiveVendorMutation,
 } = vendorsApi;

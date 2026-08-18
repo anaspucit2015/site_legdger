@@ -51,4 +51,7 @@ export class UpdateVendorDto {
 
   @IsOptional()
   isActive?: boolean;
+
+  @IsOptional()
+  isArchived?: boolean;
 }

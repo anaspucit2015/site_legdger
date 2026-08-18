@@ -7,6 +7,7 @@ export type User = {
   email: string;
   role: 'admin' | 'site_supervisor' | 'accountant';
   isActive: boolean;
+  isArchived: boolean;
   createdAt: string;
 };
 
@@ -34,7 +35,17 @@ export const usersApi = baseApi.injectEndpoints({
       query: (id) => ({ url: `/users/${id}`, method: 'DELETE' }),
       invalidatesTags: ['User'],
     }),
+    archiveUser: build.mutation<User, string>({
+      query: (id) => ({ url: `/users/${id}/archive`, method: 'PATCH' }),
+      invalidatesTags: ['User'],
+    }),
   }),
 });
 
-export const { useGetUsersQuery, useCreateUserMutation, useUpdateUserMutation, useDeactivateUserMutation } = usersApi;
+export const {
+  useGetUsersQuery,
+  useCreateUserMutation,
+  useUpdateUserMutation,
+  useDeactivateUserMutation,
+  useArchiveUserMutation,
+} = usersApi;

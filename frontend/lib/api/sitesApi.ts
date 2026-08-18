@@ -7,6 +7,7 @@ export type Site = {
   name: string;
   location: string;
   isActive: boolean;
+  isArchived: boolean;
   createdAt: string;
 };
 
@@ -38,6 +39,10 @@ export const sitesApi = baseApi.injectEndpoints({
       query: (id) => ({ url: `/sites/${id}`, method: 'DELETE' }),
       invalidatesTags: ['Site'],
     }),
+    archiveSite: build.mutation<Site, string>({
+      query: (id) => ({ url: `/sites/${id}/archive`, method: 'PATCH' }),
+      invalidatesTags: ['Site'],
+    }),
   }),
 });
 
@@ -47,4 +52,5 @@ export const {
   useCreateSiteMutation,
   useUpdateSiteMutation,
   useDeactivateSiteMutation,
+  useArchiveSiteMutation,
 } = sitesApi;

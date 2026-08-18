@@ -21,7 +21,7 @@ export class VendorsService {
 
   findActive() {
     return this.prisma.vendor.findMany({
-      where: { isActive: true },
+      where: { isActive: true, isArchived: false },
       orderBy: { name: 'asc' },
     });
   }
@@ -40,5 +40,10 @@ export class VendorsService {
   async deactivate(id: string) {
     await this.findOne(id);
     return this.prisma.vendor.update({ where: { id }, data: { isActive: false } });
+  }
+
+  async archive(id: string) {
+    await this.findOne(id);
+    return this.prisma.vendor.update({ where: { id }, data: { isArchived: true } });
   }
 }
