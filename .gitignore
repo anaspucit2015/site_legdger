@@ -9,8 +9,6 @@ frontend/out/
 backend/dist/
 
 # Environment
-.env
-.env.local
 .env.*.local
 
 # Logs
@@ -23,3 +21,4 @@ npm-debug.log*
 # Editor
 .vscode/
 .idea/
+config.bat

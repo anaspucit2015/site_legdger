@@ -7,6 +7,7 @@ import {
   PageHeader, Pagination,
 } from '@/components/ui';
 import { Plus } from 'lucide-react';
+import { toast } from 'sonner';
 
 type Filter = 'all' | 'active' | 'inactive' | 'archived';
 
@@ -57,10 +58,34 @@ export default function AdminSitesPage() {
     }
   }
 
+  async function handleDeactivate(id: string) {
+    try {
+      await deactivate(id).unwrap();
+      toast.success('Site deactivated successfully.');
+    } catch (err: any) {
+      toast.error(err?.data?.message ?? 'Failed to deactivate site.');
+    }
+  }
+
+  async function handleReactivate(id: string) {
+    try {
+      await updateSite({ id, isActive: true }).unwrap();
+      toast.success('Site reactivated successfully.');
+    } catch (err: any) {
+      toast.error(err?.data?.message ?? 'Failed to reactivate site.');
+    }
+  }
+
   async function handleArchiveConfirm() {
     if (!archiveTarget) return;
-    await archiveSite(archiveTarget.id);
-    setArchiveTarget(null);
+    try {
+      await archiveSite(archiveTarget.id).unwrap();
+      toast.success('Site archived successfully.');
+      setArchiveTarget(null);
+    } catch (err: any) {
+      toast.error(err?.data?.message ?? 'Failed to archive site.');
+      setArchiveTarget(null);
+    }
   }
 
   return (
@@ -129,12 +154,12 @@ export default function AdminSitesPage() {
                   <Td right>
                     <div className="flex gap-2 justify-end">
                       {!s.isActive && !s.isArchived && (
-                        <Button size="sm" variant="ghost" onClick={() => updateSite({ id: s.id, isActive: true })} style={{ color: '#1e6e49' }}>
+                        <Button size="sm" variant="ghost" onClick={() => handleReactivate(s.id)} style={{ color: '#1e6e49' }}>
                           Reactivate
                         </Button>
                       )}
                       {s.isActive && !s.isArchived && (
-                        <Button size="sm" variant="ghost" onClick={() => deactivate(s.id)} style={{ color: 'var(--text-muted)' }}>
+                        <Button size="sm" variant="ghost" onClick={() => handleDeactivate(s.id)} style={{ color: 'var(--text-muted)' }}>
                           Deactivate
                         </Button>
                       )}

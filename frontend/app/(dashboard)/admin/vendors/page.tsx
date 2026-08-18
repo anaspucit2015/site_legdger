@@ -7,6 +7,7 @@ import {
   PageHeader, Pagination,
 } from '@/components/ui';
 import { Plus } from 'lucide-react';
+import { toast } from 'sonner';
 
 type Filter = 'all' | 'active' | 'inactive' | 'archived';
 
@@ -60,10 +61,34 @@ export default function AdminVendorsPage() {
     }
   }
 
+  async function handleDeactivate(id: string) {
+    try {
+      await deactivate(id).unwrap();
+      toast.success('Vendor deactivated successfully.');
+    } catch (err: any) {
+      toast.error(err?.data?.message ?? 'Failed to deactivate vendor.');
+    }
+  }
+
+  async function handleReactivate(id: string) {
+    try {
+      await updateVendor({ id, isActive: true }).unwrap();
+      toast.success('Vendor reactivated successfully.');
+    } catch (err: any) {
+      toast.error(err?.data?.message ?? 'Failed to reactivate vendor.');
+    }
+  }
+
   async function handleArchiveConfirm() {
     if (!archiveTarget) return;
-    await archiveVendor(archiveTarget.id);
-    setArchiveTarget(null);
+    try {
+      await archiveVendor(archiveTarget.id).unwrap();
+      toast.success('Vendor archived successfully.');
+      setArchiveTarget(null);
+    } catch (err: any) {
+      toast.error(err?.data?.message ?? 'Failed to archive vendor.');
+      setArchiveTarget(null);
+    }
   }
 
   return (
@@ -134,12 +159,12 @@ export default function AdminVendorsPage() {
                   <Td right>
                     <div className="flex gap-2 justify-end">
                       {!v.isActive && !v.isArchived && (
-                        <Button size="sm" variant="ghost" onClick={() => updateVendor({ id: v.id, isActive: true })} style={{ color: '#1e6e49' }}>
+                        <Button size="sm" variant="ghost" onClick={() => handleReactivate(v.id)} style={{ color: '#1e6e49' }}>
                           Reactivate
                         </Button>
                       )}
                       {v.isActive && !v.isArchived && (
-                        <Button size="sm" variant="ghost" onClick={() => deactivate(v.id)} style={{ color: 'var(--text-muted)' }}>
+                        <Button size="sm" variant="ghost" onClick={() => handleDeactivate(v.id)} style={{ color: 'var(--text-muted)' }}>
                           Deactivate
                         </Button>
                       )}

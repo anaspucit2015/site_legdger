@@ -46,21 +46,21 @@ export class SitesController {
   }
 
   @UseGuards(RolesGuard)
-  @Roles('admin')
+  @Roles('admin', 'accountant')
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: UpdateSiteDto) {
     return this.sitesService.update(id, dto);
   }
 
   @UseGuards(RolesGuard)
-  @Roles('admin')
+  @Roles('admin', 'accountant')
   @Patch(':id/archive')
   archive(@Param('id') id: string) {
     return this.sitesService.archive(id);
   }
 
   @UseGuards(RolesGuard)
-  @Roles('admin')
+  @Roles('admin', 'accountant')
   @Delete(':id')
   deactivate(@Param('id') id: string) {
     return this.sitesService.deactivate(id);

@@ -27,11 +27,13 @@ export class UsersController {
     return this.usersService.create(dto);
   }
 
+  @Roles('admin', 'accountant')
   @Get()
   findAll(@Query('page') page?: string, @Query('limit') limit?: string) {
     return this.usersService.findAll(Number(page) || 1, Number(limit) || 20);
   }
 
+  @Roles('admin', 'accountant')
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.usersService.findOne(id);

@@ -33,21 +33,21 @@ export class VendorsController {
   }
 
   @UseGuards(RolesGuard)
-  @Roles('admin')
+  @Roles('admin', 'accountant')
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: UpdateVendorDto) {
     return this.vendorsService.update(id, dto);
   }
 
   @UseGuards(RolesGuard)
-  @Roles('admin')
+  @Roles('admin', 'accountant')
   @Patch(':id/archive')
   archive(@Param('id') id: string) {
     return this.vendorsService.archive(id);
   }
 
   @UseGuards(RolesGuard)
-  @Roles('admin')
+  @Roles('admin', 'accountant')
   @Delete(':id')
   deactivate(@Param('id') id: string) {
     return this.vendorsService.deactivate(id);

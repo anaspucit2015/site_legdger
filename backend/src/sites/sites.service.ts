@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateSiteDto, UpdateSiteDto } from './sites.dto';
 
@@ -37,19 +37,31 @@ export class SitesService {
     return this.prisma.site.update({ where: { id }, data: dto });
   }
 
+  private async checkNoOpenRecords(siteId: string) {
+    const [invoiceCount, billCount] = await Promise.all([
+      this.prisma.invoice.count({
+        where: { siteId, status: { in: ['pending', 'approved'] } },
+      }),
+      this.prisma.bill.count({
+        where: { siteId, status: { in: ['pending', 'approved'] } },
+      }),
+    ]);
+    if (invoiceCount > 0 || billCount > 0) {
+      throw new BadRequestException(
+        `Cannot perform this action — site has ${invoiceCount + billCount} invoice(s)/bill(s) that are still pending or approved. All must be paid or rejected first.`,
+      );
+    }
+  }
+
   async deactivate(id: string) {
     await this.findOne(id);
-    return this.prisma.site.update({
-      where: { id },
-      data: { isActive: false },
-    });
+    await this.checkNoOpenRecords(id);
+    return this.prisma.site.update({ where: { id }, data: { isActive: false } });
   }
 
   async archive(id: string) {
     await this.findOne(id);
-    return this.prisma.site.update({
-      where: { id },
-      data: { isArchived: true },
-    });
+    await this.checkNoOpenRecords(id);
+    return this.prisma.site.update({ where: { id }, data: { isArchived: true } });
   }
 }

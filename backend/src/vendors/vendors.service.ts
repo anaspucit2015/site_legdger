@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateVendorDto, UpdateVendorDto } from './vendors.dto';
 
@@ -37,13 +37,31 @@ export class VendorsService {
     return this.prisma.vendor.update({ where: { id }, data: dto });
   }
 
+  private async checkNoOpenRecords(vendorId: string) {
+    const [invoiceCount, billCount] = await Promise.all([
+      this.prisma.invoice.count({
+        where: { vendorId, status: { in: ['pending', 'approved'] } },
+      }),
+      this.prisma.bill.count({
+        where: { vendorId, status: { in: ['pending', 'approved'] } },
+      }),
+    ]);
+    if (invoiceCount > 0 || billCount > 0) {
+      throw new BadRequestException(
+        `Cannot perform this action — vendor has ${invoiceCount + billCount} invoice(s)/bill(s) that are still pending or approved. All must be paid or rejected first.`,
+      );
+    }
+  }
+
   async deactivate(id: string) {
     await this.findOne(id);
+    await this.checkNoOpenRecords(id);
     return this.prisma.vendor.update({ where: { id }, data: { isActive: false } });
   }
 
   async archive(id: string) {
     await this.findOne(id);
+    await this.checkNoOpenRecords(id);
     return this.prisma.vendor.update({ where: { id }, data: { isArchived: true } });
   }
 }
