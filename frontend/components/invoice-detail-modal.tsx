@@ -1,0 +1,185 @@
+'use client';
+import { Invoice } from '@/lib/api/invoicesApi';
+import { Modal } from '@/components/ui';
+import { StatusStamp } from '@/components/status-stamp';
+import { CheckCircle, Clock, CreditCard, XCircle, Trash2, ExternalLink } from 'lucide-react';
+
+function Row({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) {
+  return (
+    <div className="flex items-start justify-between gap-4 py-2.5" style={{ borderBottom: '1px solid var(--border)' }}>
+      <span className="text-xs font-medium uppercase tracking-wide shrink-0" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-body)', minWidth: 120 }}>
+        {label}
+      </span>
+      <span
+        className="text-sm text-right"
+        style={{
+          color: 'var(--navy)',
+          fontFamily: mono ? 'var(--font-mono)' : 'var(--font-body)',
+          fontWeight: mono ? 500 : 400,
+        }}
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function TimelineStep({
+  icon: Icon,
+  label,
+  date,
+  done,
+  color,
+}: {
+  icon: React.ElementType;
+  label: string;
+  date?: string | null;
+  done: boolean;
+  color: string;
+}) {
+  return (
+    <div className="flex items-center gap-3">
+      <div
+        className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
+        style={{ background: done ? color + '1a' : '#f2f2f2' }}
+      >
+        <Icon size={13} style={{ color: done ? color : 'var(--text-muted)' }} />
+      </div>
+      <div>
+        <p className="text-xs font-semibold" style={{ color: done ? 'var(--navy)' : 'var(--text-muted)' }}>{label}</p>
+        {date && <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{new Date(date).toLocaleDateString('en-PK', { day: 'numeric', month: 'short', year: 'numeric' })}</p>}
+      </div>
+    </div>
+  );
+}
+
+interface Props {
+  invoice: Invoice | null;
+  onClose: () => void;
+  actions?: React.ReactNode;
+}
+
+export function InvoiceDetailModal({ invoice: inv, onClose, actions }: Props) {
+  if (!inv) return null;
+
+  const isRejected = inv.status === 'rejected';
+  const isVoided   = inv.status === 'voided';
+  const isApproved = inv.status === 'approved';
+
+  return (
+    <Modal
+      open={!!inv}
+      onClose={onClose}
+      title={`INV-${String(inv.invoiceNumber).padStart(5, '0')}`}
+      subtitle={`${inv.site?.name ?? '—'} · ${inv.task?.name ?? inv.customTaskName ?? '—'}`}
+      maxWidth={640}
+    >
+      {/* Amount + status hero */}
+      <div
+        className="rounded-xl px-5 py-4 mb-5 flex items-center justify-between"
+        style={{ background: 'var(--paper)' }}
+      >
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--text-muted)' }}>Total Amount</p>
+          <p className="text-2xl font-bold" style={{ color: 'var(--navy)', fontFamily: 'var(--font-mono)' }}>
+            Rs. {Number(inv.amount).toLocaleString()}
+          </p>
+        </div>
+        <StatusStamp status={inv.status} />
+      </div>
+
+      {/* Detail rows */}
+      <div className="mb-5">
+        <Row label="Site"       value={inv.site?.name ?? '—'} />
+        <Row label="Task"       value={inv.task?.name ?? inv.customTaskName ?? '—'} />
+        <Row label="Quantity"   value={`${Number(inv.quantity).toLocaleString()} ${inv.unit}`} mono />
+        {inv.unitCostSnapshot && (
+          <Row label="Rate"     value={`Rs. ${Number(inv.unitCostSnapshot).toLocaleString()} / ${inv.unit}`} mono />
+        )}
+        {inv.vendor && <Row label="Vendor"       value={inv.vendor.name} />}
+        {inv.submittedBy && <Row label="Submitted By" value={inv.submittedBy.name} />}
+        <Row label="Submitted"  value={new Date(inv.submittedAt).toLocaleDateString('en-PK', { day: 'numeric', month: 'short', year: 'numeric' })} />
+        {isVoided && (
+          <Row label="Status" value="Voided" />
+        )}
+      </div>
+
+      {/* Receipt photo */}
+      {inv.attachmentUrl && (
+        <div className="mb-5">
+          <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--text-muted)' }}>Receipt</p>
+          <div className="relative inline-block">
+            <a href={inv.attachmentUrl} target="_blank" rel="noopener noreferrer">
+              <img
+                src={inv.attachmentUrl}
+                alt="Receipt"
+                className="rounded-xl object-cover"
+                style={{ width: 220, height: 220, border: '1.5px solid var(--border)', display: 'block' }}
+              />
+              <div
+                className="absolute inset-0 rounded-xl flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity"
+                style={{ background: 'rgba(27,42,76,0.55)' }}
+              >
+                <ExternalLink size={22} color="white" />
+              </div>
+            </a>
+          </div>
+        </div>
+      )}
+
+      {/* Description */}
+      {inv.description && (
+        <div className="rounded-lg px-4 py-3 mb-5" style={{ background: 'var(--paper)', border: '1px solid var(--border)' }}>
+          <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--text-muted)' }}>Description</p>
+          <p className="text-sm" style={{ color: 'var(--navy)' }}>{inv.description}</p>
+        </div>
+      )}
+
+      {/* Delete request notice */}
+      {inv.deleteRequested && (
+        <div className="rounded-lg px-4 py-3 mb-5 flex gap-3" style={{ background: '#FDF0ED', border: '1px solid #f5c4b8' }}>
+          <Trash2 size={15} style={{ color: 'var(--rust)', flexShrink: 0, marginTop: 2 }} />
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--rust)' }}>Deletion Requested</p>
+            <p className="text-sm" style={{ color: 'var(--rust)' }}>
+              You submitted a request to delete this invoice
+              {inv.deleteRequestedAt ? ` on ${new Date(inv.deleteRequestedAt).toLocaleDateString('en-PK', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}.
+              An admin will review and either approve the deletion or deny it. Until then, this invoice remains active.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Rejection reason */}
+      {isRejected && inv.rejectionReason && (
+        <div className="rounded-lg px-4 py-3 mb-5" style={{ background: '#fdf0ed', border: '1px solid #f5c4b8' }}>
+          <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--rust)' }}>Rejection Reason</p>
+          <p className="text-sm" style={{ color: 'var(--rust)' }}>
+            {inv.rejectionReason === 'Other' ? (inv.rejectionReasonOther ?? inv.rejectionReason) : inv.rejectionReason}
+          </p>
+        </div>
+      )}
+
+      {/* Timeline */}
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: 'var(--text-muted)' }}>Timeline</p>
+        <div className="flex flex-col gap-3">
+          <TimelineStep icon={Clock}       label="Submitted" date={inv.submittedAt} done color="#E8A33D" />
+          {isRejected
+            ? <TimelineStep icon={XCircle}     label="Rejected" date={inv.approvedAt} done color="#C4522E" />
+            : isVoided
+              ? <><TimelineStep icon={CheckCircle} label="Approved" date={inv.approvedAt} done color="#2F9E6E" /><TimelineStep icon={XCircle} label="Voided" date={inv.approvedAt} done color="#888" /></>
+              : <TimelineStep icon={CheckCircle} label="Approved" date={inv.approvedAt}  done={isApproved} color="#2F9E6E" />
+          }
+        </div>
+      </div>
+
+      {/* Actions */}
+      {actions && (
+        <div className="flex gap-2 justify-end pt-4 mt-4" style={{ borderTop: '1px solid var(--border)' }}>
+          {actions}
+        </div>
+      )}
+    </Modal>
+  );
+}

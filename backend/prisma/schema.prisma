@@ -1,0 +1,239 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  admin
+  site_supervisor
+  accountant
+}
+
+enum InvoiceStatus {
+  pending
+  approved
+  rejected
+  voided
+}
+
+enum VendorTxnType {
+  ADVANCE_GIVEN
+  INVOICE_APPROVED
+  BILL_APPROVED
+  ADVANCE_APPLIED
+  VENDOR_PAYMENT
+  REVERSAL
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  CHEQUE
+  JAZZCASH_EASYPAISA
+}
+
+model User {
+  id         String   @id @default(cuid())
+  name       String
+  email      String   @unique
+  password   String
+  role       Role
+  isActive   Boolean  @default(true)
+  isArchived Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  invoices           Invoice[]           @relation("SubmittedInvoices")
+  bills              Bill[]              @relation("SubmittedBills")
+  vendorTransactions VendorTransaction[] @relation("PerformedTransactions")
+}
+
+model Vendor {
+  id             String   @id @default(cuid())
+  name           String
+  contactPerson  String?
+  phone          String?
+  email          String?
+  address        String?
+  bankName       String?
+  accountTitle   String?
+  accountNumber  String?
+  iban           String?
+  branchCode     String?
+  currentBalance Decimal  @default(0) // Outstanding balance — we owe vendor
+  advanceBalance Decimal  @default(0) // Advance given, not yet applied
+  isActive       Boolean  @default(true)
+  isArchived     Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  invoices     Invoice[]
+  bills        Bill[]
+  transactions VendorTransaction[]
+}
+
+model Site {
+  id             String   @id @default(cuid())
+  siteCode       Int      @unique @default(autoincrement())
+  name           String
+  location       String
+  currentBalance Decimal  @default(0)
+  isActive       Boolean  @default(true)
+  isArchived     Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  invoices Invoice[]
+  bills    Bill[]
+}
+
+model Task {
+  id        String   @id @default(cuid())
+  name      String
+  unit      String
+  unitCost  Decimal?
+  isCustom  Boolean  @default(false)
+  isActive  Boolean  @default(true)
+  createdBy String
+  createdAt DateTime @default(now())
+
+  rateHistory   TaskRateHistory[]
+  invoices      Invoice[]
+  billLineItems BillLineItem[]
+}
+
+model TaskRateHistory {
+  id        String   @id @default(cuid())
+  taskId    String
+  oldRate   Decimal?
+  newRate   Decimal
+  changedBy String
+  changedAt DateTime @default(now())
+
+  task Task @relation(fields: [taskId], references: [id])
+}
+
+model Invoice {
+  id               String        @id @default(cuid())
+  invoiceNumber    Int           @unique @default(autoincrement())
+  taskId           String?
+  customTaskName   String?
+  siteId           String
+  submittedById    String
+  vendorId         String?
+  unit             String
+  quantity         Decimal
+  unitCostSnapshot Decimal?
+  amount           Decimal
+  description      String?
+  attachmentUrl    String?
+
+  status InvoiceStatus @default(pending)
+
+  rejectionReason      String?
+  rejectionReasonOther String?
+
+  deleteRequested   Boolean   @default(false)
+  deleteRequestedBy String?
+  deleteRequestedAt DateTime?
+  deleteApprovedBy  String?
+  deleteDecisionAt  DateTime?
+
+  submittedAt DateTime  @default(now())
+  approvedBy  String?
+  approvedAt  DateTime?
+
+  syncVersion Int      @default(1)
+  updatedAt   DateTime @updatedAt
+
+  task         Task?               @relation(fields: [taskId], references: [id])
+  site         Site                @relation(fields: [siteId], references: [id])
+  submittedBy  User                @relation("SubmittedInvoices", fields: [submittedById], references: [id])
+  vendor       Vendor?             @relation(fields: [vendorId], references: [id])
+  transactions VendorTransaction[]
+}
+
+model Bill {
+  id            String        @id @default(cuid())
+  billNumber    Int           @unique @default(autoincrement())
+  siteId        String
+  vendorId      String?
+  submittedById String
+  totalAmount   Decimal
+  description   String?
+  attachmentUrl String?
+  status        InvoiceStatus @default(pending)
+
+  rejectionReason      String?
+  rejectionReasonOther String?
+
+  deleteRequested   Boolean   @default(false)
+  deleteRequestedBy String?
+  deleteRequestedAt DateTime?
+  deleteApprovedBy  String?
+  deleteDecisionAt  DateTime?
+
+  submittedAt DateTime  @default(now())
+  approvedBy  String?
+  approvedAt  DateTime?
+
+  syncVersion Int      @default(1)
+  updatedAt   DateTime @updatedAt
+
+  site         Site                @relation(fields: [siteId], references: [id])
+  vendor       Vendor?             @relation(fields: [vendorId], references: [id])
+  submittedBy  User                @relation("SubmittedBills", fields: [submittedById], references: [id])
+  lineItems    BillLineItem[]
+  transactions VendorTransaction[]
+}
+
+model BillLineItem {
+  id               String   @id @default(cuid())
+  billId           String
+  taskId           String?
+  customTaskName   String?
+  unit             String
+  quantity         Decimal
+  unitCostSnapshot Decimal?
+  amount           Decimal
+
+  bill Bill  @relation(fields: [billId], references: [id], onDelete: Cascade)
+  task Task? @relation(fields: [taskId], references: [id])
+}
+
+model VendorTransaction {
+  id                   String         @id @default(cuid())
+  vendorId             String
+  type                 VendorTxnType
+  amount               Decimal        @db.Decimal(12, 2)
+
+  // VENDOR_PAYMENT only
+  paymentMethod        PaymentMethod?
+  paymentRef           String?
+  invoiceReferenceNote String?
+
+  // INVOICE_APPROVED / BILL_APPROVED only
+  invoiceId  String?
+  billId     String?
+
+  // REVERSAL only
+  reversesId String?
+
+  outstandingAfter Decimal  @db.Decimal(12, 2)
+  advanceAfter     Decimal  @db.Decimal(12, 2)
+
+  notes         String?
+  performedById String
+  createdAt     DateTime @default(now())
+
+  vendor      Vendor             @relation(fields: [vendorId], references: [id])
+  invoice     Invoice?           @relation(fields: [invoiceId], references: [id])
+  bill        Bill?              @relation(fields: [billId], references: [id])
+  performedBy User               @relation("PerformedTransactions", fields: [performedById], references: [id])
+  reverses    VendorTransaction? @relation("Reversal", fields: [reversesId], references: [id])
+  reversedBy  VendorTransaction[] @relation("Reversal")
+}
