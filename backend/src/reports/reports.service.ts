@@ -102,7 +102,6 @@ export class ReportsService {
       { header: 'Qty',              key: 'qty',              width: 10 },
       { header: 'Rate (PKR)',       key: 'rate',             width: 14 },
       { header: 'Amount (PKR)',     key: 'amount',           width: 16 },
-      { header: 'Bill Total (PKR)', key: 'billTotal',        width: 16 },
       { header: 'Status',           key: 'status',           width: 12 },
       { header: 'Submitted',        key: 'submittedAt',      width: 14 },
       { header: 'Approved',         key: 'approvedAt',       width: 14 },
@@ -131,7 +130,6 @@ export class ReportsService {
           qty:              Number(li.quantity),
           rate:             li.unitCostSnapshot ? Number(li.unitCostSnapshot) : '',
           amount:           Number(li.amount),
-          billTotal,
           status:           bill.status,
           submittedAt:      bill.submittedAt ? new Date(bill.submittedAt).toLocaleDateString('en-PK') : '',
           approvedAt:       bill.approvedAt  ? new Date(bill.approvedAt).toLocaleDateString('en-PK')  : '',
@@ -144,7 +142,6 @@ export class ReportsService {
         row.getCell('rate').alignment      = { horizontal: 'right', vertical: 'middle' };
         row.getCell('amount').alignment    = { horizontal: 'right', vertical: 'middle' };
         row.getCell('amount').font         = boldFont;
-        row.getCell('billTotal').alignment = { horizontal: 'right', vertical: 'middle' };
         billRowIdx++;
       }
       billGrandTotal += billTotal;
@@ -152,9 +149,9 @@ export class ReportsService {
     if (bills.length === 0) {
       bill_sheet.addRow({ billNum: '—', site: 'No bills found for selected filters.' });
     } else {
-      const tr = bill_sheet.addRow({ site: 'TOTAL', billTotal: billGrandTotal });
-      tr.getCell('site').font = boldFont; tr.getCell('billTotal').font = boldFont;
-      tr.getCell('billTotal').alignment = { horizontal: 'right', vertical: 'middle' };
+      const tr = bill_sheet.addRow({ site: 'TOTAL', amount: billGrandTotal });
+      tr.getCell('site').font = boldFont; tr.getCell('amount').font = boldFont;
+      tr.getCell('amount').alignment = { horizontal: 'right', vertical: 'middle' };
       tr.getCell('site').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8F4F8' } };
     }
     bill_sheet.views = [{ state: 'frozen', ySplit: 1 }];
@@ -287,7 +284,6 @@ export class ReportsService {
       { header: 'Qty',             key: 'qty',              width: 10 },
       { header: 'Rate (PKR)',      key: 'rate',             width: 14 },
       { header: 'Amount (PKR)',    key: 'amount',           width: 16 },
-      { header: 'Bill Total (PKR)',key: 'billTotal',        width: 16 },
       { header: 'Status',          key: 'status',           width: 12 },
       { header: 'Submitted',       key: 'submittedAt',      width: 14 },
       { header: 'Approved',        key: 'approvedAt',       width: 14 },
@@ -325,7 +321,6 @@ export class ReportsService {
           qty:              Number(li.quantity),
           rate:             li.unitCostSnapshot ? Number(li.unitCostSnapshot) : '',
           amount:           Number(li.amount),
-          billTotal,
           status:           bill.status,
           submittedAt:      bill.submittedAt ? new Date(bill.submittedAt).toLocaleDateString('en-PK') : '',
           approvedAt:       bill.approvedAt  ? new Date(bill.approvedAt).toLocaleDateString('en-PK')  : '',
@@ -345,7 +340,6 @@ export class ReportsService {
         row.getCell('rate').alignment      = { horizontal: 'right', vertical: 'middle' };
         row.getCell('amount').alignment    = { horizontal: 'right', vertical: 'middle' };
         row.getCell('amount').font         = { bold: true };
-        row.getCell('billTotal').alignment = { horizontal: 'right', vertical: 'middle' };
 
         rowIdx++;
       }
@@ -353,10 +347,10 @@ export class ReportsService {
       grandTotal += billTotal;
     }
 
-    const totalRow = sheet.addRow({ site: 'TOTAL', billTotal: grandTotal });
+    const totalRow = sheet.addRow({ site: 'TOTAL', amount: grandTotal });
     totalRow.getCell('site').font      = { bold: true };
-    totalRow.getCell('billTotal').font = { bold: true };
-    totalRow.getCell('billTotal').alignment = { horizontal: 'right', vertical: 'middle' };
+    totalRow.getCell('amount').font = { bold: true };
+    totalRow.getCell('amount').alignment = { horizontal: 'right', vertical: 'middle' };
     totalRow.getCell('site').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8F4F8' } };
 
     sheet.views = [{ state: 'frozen', ySplit: 1 }];
@@ -382,14 +376,17 @@ export class ReportsService {
       }),
     ]);
 
-    // Resolve entity name
+    // Resolve entity name and opening balance
     let entityName = 'Unknown';
+    let openingBalance = 0;
     if (filter.siteId) {
-      const site = await this.prisma.site.findUnique({ where: { id: filter.siteId }, select: { name: true } });
+      const site = await this.prisma.site.findUnique({ where: { id: filter.siteId }, select: { name: true, currentBalance: true } });
       entityName = site?.name ?? filter.siteId;
+      openingBalance = Number(site?.currentBalance ?? 0);
     } else if (filter.vendorId) {
-      const vendor = await this.prisma.vendor.findUnique({ where: { id: filter.vendorId }, select: { name: true } });
+      const vendor = await this.prisma.vendor.findUnique({ where: { id: filter.vendorId }, select: { name: true, currentBalance: true } });
       entityName = vendor?.name ?? filter.vendorId;
+      openingBalance = Number(vendor?.currentBalance ?? 0);
     }
 
     // Vendor name map
@@ -424,6 +421,7 @@ export class ReportsService {
       approved: inv.approved + bill.approved, pending: inv.pending + bill.pending,
       rejected: inv.rejected + bill.rejected,
       totalCount: inv.totalCount + bill.totalCount,
+      grandTotal: inv.total + bill.total + openingBalance,
     };
 
     const workbook   = new ExcelJS.Workbook();
@@ -486,8 +484,25 @@ export class ReportsService {
     titleRow.getCell(1).alignment = { horizontal: 'left', vertical: 'middle' };
     sum_sheet.addRow([]);
 
-    // Combined grand total
-    const grandRow = sum_sheet.addRow([`Grand Total`, combined.total, combined.totalCount]);
+    // Opening balance
+    const openingRow = sum_sheet.addRow([`Opening Balance`, openingBalance, '']);
+    openingRow.eachCell({ includeEmpty: true }, (c) => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8F4F8' } }; c.alignment = { vertical: 'middle' }; });
+    openingRow.getCell(1).font = boldFont;
+    openingRow.getCell(2).numFmt = '#,##0';
+    openingRow.getCell(2).alignment = { horizontal: 'right', vertical: 'middle' };
+    openingRow.height = 19;
+
+    // Invoices + bills movement total
+    const movementRow = sum_sheet.addRow([`Invoices + Bills`, combined.total, combined.totalCount]);
+    movementRow.eachCell({ includeEmpty: true }, (c) => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } }; c.alignment = { vertical: 'middle' }; });
+    movementRow.getCell(1).font = boldFont;
+    movementRow.getCell(2).numFmt = '#,##0';
+    movementRow.getCell(2).alignment = { horizontal: 'right', vertical: 'middle' };
+    movementRow.getCell(3).alignment = { horizontal: 'center', vertical: 'middle' };
+    movementRow.height = 19;
+
+    // Combined grand total (opening balance + invoices + bills)
+    const grandRow = sum_sheet.addRow([`Grand Total`, combined.grandTotal, combined.totalCount]);
     grandRow.eachCell({ includeEmpty: true }, (c) => { c.fill = navyFill; c.font = navyFont; c.alignment = { vertical: 'middle' }; });
     grandRow.getCell(2).numFmt = '#,##0';
     grandRow.getCell(2).alignment = { horizontal: 'right', vertical: 'middle' };

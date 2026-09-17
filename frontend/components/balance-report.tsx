@@ -169,8 +169,9 @@ export function BalanceReport({ type }: Props) {
       if (type === 'site')   params.set('siteId',   selectedId);
       if (type === 'vendor') params.set('vendorId', selectedId);
 
+      const base = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/reports/balance?${params}`,
+        `${base}/reports/balance?${params}`,
         { headers: { Authorization: `Bearer ${getToken()}` } },
       );
 

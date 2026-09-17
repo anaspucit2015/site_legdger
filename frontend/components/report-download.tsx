@@ -5,6 +5,8 @@ import { useGetActiveSitesQuery } from '@/lib/api/sitesApi';
 import { Button, PageHeader, Select } from '@/components/ui';
 import { getToken } from '@/lib/auth';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+
 function ClearableSelect({
   label, value, onChange, options, placeholder, loading,
 }: {
@@ -94,7 +96,7 @@ export function ReportDownload() {
       setLoadingVendors(true);
       try {
         const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/reports/vendors`,
+          `${API_URL}/reports/vendors`,
           { headers: { Authorization: `Bearer ${getToken()}` } },
         );
         setVendors(await res.json());
@@ -106,7 +108,7 @@ export function ReportDownload() {
       setLoadingSupervisors(true);
       try {
         const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/reports/supervisors`,
+          `${API_URL}/reports/supervisors`,
           { headers: { Authorization: `Bearer ${getToken()}` } },
         );
         setSupervisors(await res.json());
@@ -137,7 +139,7 @@ export function ReportDownload() {
       if (dateTo)       params.set('dateTo',       dateTo);
 
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/reports/combined?${params}`,
+        `${API_URL}/reports/combined?${params}`,
         { headers: { Authorization: `Bearer ${getToken()}` } },
       );
 
