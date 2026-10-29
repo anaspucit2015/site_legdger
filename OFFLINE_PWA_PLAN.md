@@ -35,15 +35,20 @@ Also read SPEC.md and VENDOR_PAYMENT_SPEC_v2.md for context on the data model
 
 ## Phase 1 — Make the app installable
 
-1. Install @ducanh2912/next-pwa in /frontend
-2. Configure next.config.ts to wrap with next-pwa
+1. Install Serwist (`serwist` + `@serwist/turbopack`) in /frontend — chosen over
+   the originally-planned `@ducanh2912/next-pwa` because that package's Workbox
+   tooling doesn't support Turbopack, which this project's build uses; Serwist
+   is the actively-maintained, Turbopack-compatible successor in the same
+   lineage
+2. Configure next.config.ts to wrap with withSerwist from @serwist/turbopack,
+   and add a service worker entry point at app/sw.ts
 3. Create manifest.json using the existing SiteLedger icons already in
    /frontend/public/icons/ (icon-512x512.png, icon-192x192.png,
    apple-touch-icon-180x180.png, favicon-32x32.png) — reference design-tokens.ts
    for theme_color/background_color values (navy #1B3A5C, paper #F6F5F1)
 4. Add the manifest link + meta tags to the root layout
-5. Configure Workbox caching strategy for static assets (JS/CSS/fonts) as
-   cache-first, and API GET requests as network-first with cache fallback
+5. Configure Serwist's runtime caching strategy for static assets (JS/CSS/fonts)
+   as cache-first, and API GET requests as network-first with cache fallback
 6. Add a custom "Install App" button using the beforeinstallprompt event —
    don't rely on the default browser install prompt
 
@@ -69,7 +74,7 @@ feature/offline-pwa.
 ### Manual test before merging to `feature/offline-pwa`
 - [ ] Deployed to a preview URL (not just localhost)
 - [ ] Install prompt/icon appears correctly on a real phone
-- [ ] `npm run build` succeeds cleanly
+- [x] `npm run build` succeeds cleanly (verified 2026-10-29)
 - [ ] No console errors on fresh load
 - [ ] Existing online flows (login, create invoice, approve, etc.) still work unchanged
 
