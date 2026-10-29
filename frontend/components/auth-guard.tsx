@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getToken, getUser, AuthUser } from '@/lib/auth';
+import { ensureCacheForUser } from '@/lib/db/offlineDb';
 
 type Props = {
   children: React.ReactNode;
@@ -28,6 +29,7 @@ export function AuthGuard({ children, allowedRoles }: Props) {
       router.replace(home[user.role] ?? '/login');
       return;
     }
+    void ensureCacheForUser(user.id);
     setReady(true);
   }, [router, allowedRoles]);
 

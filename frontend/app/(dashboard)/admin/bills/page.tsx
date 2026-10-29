@@ -1,13 +1,13 @@
 'use client';
 import { useState } from 'react';
 import {
-  useGetBillsQuery,
   useApproveBillMutation,
   useRejectBillMutation,
   useAdminDeleteBillMutation,
   useAdminUpdateBillMutation,
   Bill,
 } from '@/lib/api/billsApi';
+import { useOfflineBills } from '@/lib/offline/useOfflineBills';
 import { useGetActiveVendorsQuery } from '@/lib/api/vendorsApi';
 import { StatusStamp } from '@/components/status-stamp';
 import {
@@ -40,9 +40,7 @@ const REJECTION_OPTIONS = REJECTION_REASONS.map((r) => ({ value: r, label: r }))
 export default function AdminBillsPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
-  const { data: result, isLoading } = useGetBillsQuery({ status: statusFilter || undefined, page });
-  const bills = result?.data ?? [];
-  const total = result?.total ?? 0;
+  const { bills, total, isLoading, isOffline } = useOfflineBills({ status: statusFilter || undefined, page });
 
   const { data: vendors = [] } = useGetActiveVendorsQuery();
   const [approve]      = useApproveBillMutation();
@@ -135,7 +133,7 @@ export default function AdminBillsPage() {
       {isLoading ? (
         <TableLoading />
       ) : bills.length === 0 ? (
-        <TableEmpty message="No bills found." />
+        <TableEmpty message={isOffline ? "You're offline — no cached bills to show." : 'No bills found.'} />
       ) : (
         <Table>
           <THead>

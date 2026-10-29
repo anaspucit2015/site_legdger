@@ -1,7 +1,8 @@
 'use client';
 import { useState } from 'react';
-import { useGetInvoicesQuery, useAdminDeleteInvoiceMutation, Invoice } from '@/lib/api/invoicesApi';
-import { useGetActiveSitesQuery } from '@/lib/api/sitesApi';
+import { useAdminDeleteInvoiceMutation, Invoice } from '@/lib/api/invoicesApi';
+import { useOfflineInvoices } from '@/lib/offline/useOfflineInvoices';
+import { useActiveSitesWithOfflineFallback } from '@/lib/offline/useActiveSitesWithOfflineFallback';
 import { StatusStamp } from '@/components/status-stamp';
 import { InvoiceDetailModal } from '@/components/invoice-detail-modal';
 import {
@@ -20,7 +21,7 @@ const STATUS_OPTIONS = [
 ];
 
 export default function AdminMyInvoicesPage() {
-  const { data: sites = [] } = useGetActiveSitesQuery();
+  const sites = useActiveSitesWithOfflineFallback();
   const [siteFilter, setSiteFilter]     = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [viewTarget, setViewTarget]     = useState<Invoice | null>(null);
@@ -35,14 +36,12 @@ export default function AdminMyInvoicesPage() {
     try { await adminDelete(deleteTarget.id); setDeleteTarget(null); } finally { setDeletingId(null); }
   }
 
-  const { data: result, isLoading } = useGetInvoicesQuery({
+  const { invoices, total, isLoading, isOffline } = useOfflineInvoices({
     mine: true,
     ...(siteFilter   ? { siteId: siteFilter   } : {}),
     ...(statusFilter ? { status: statusFilter } : {}),
     page,
   });
-  const invoices = result?.data ?? [];
-  const total = result?.total ?? 0;
 
   const siteOptions  = sites.map((s) => ({ value: s.id, label: s.name }));
   const totalAmount  = invoices.reduce((s, i) => s + Number(i.amount), 0);
@@ -84,7 +83,7 @@ export default function AdminMyInvoicesPage() {
       {isLoading ? (
         <TableLoading />
       ) : invoices.length === 0 ? (
-        <TableEmpty message="No invoices found." />
+        <TableEmpty message={isOffline ? "You're offline — no cached invoices to show." : 'No invoices found.'} />
       ) : (
         <Table>
           <THead>

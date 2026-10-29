@@ -1,7 +1,8 @@
 'use client';
 import { useState } from 'react';
-import { useGetActiveSitesQuery } from '@/lib/api/sitesApi';
-import { useGetBillsQuery, Bill } from '@/lib/api/billsApi';
+import { Bill } from '@/lib/api/billsApi';
+import { useOfflineBills } from '@/lib/offline/useOfflineBills';
+import { useActiveSitesWithOfflineFallback } from '@/lib/offline/useActiveSitesWithOfflineFallback';
 import { StatusStamp } from '@/components/status-stamp';
 import { BillDetailModal } from '@/components/bill-detail-modal';
 import {
@@ -19,16 +20,14 @@ const STATUS_OPTIONS = [
 ];
 
 export default function SiteSupervisorBillsPage() {
-  const { data: sites = [] } = useGetActiveSitesQuery();
+  const sites = useActiveSitesWithOfflineFallback();
   const [selectedSite, setSelectedSite] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
-  const { data: result, isLoading } = useGetBillsQuery(
+  const { bills, total, isLoading, isOffline } = useOfflineBills(
     { siteId: selectedSite, ...(statusFilter ? { status: statusFilter } : {}), page },
     { skip: !selectedSite },
   );
-  const bills = result?.data ?? [];
-  const total = result?.total ?? 0;
   const [viewTarget, setViewTarget] = useState<Bill | null>(null);
 
   const siteOptions = sites.map((s) => ({ value: s.id, label: s.name }));
@@ -61,7 +60,7 @@ export default function SiteSupervisorBillsPage() {
       ) : isLoading ? (
         <TableLoading />
       ) : bills.length === 0 ? (
-        <TableEmpty message="No bills submitted on this site yet." />
+        <TableEmpty message={isOffline ? "You're offline — no cached bills for this site yet." : 'No bills submitted on this site yet.'} />
       ) : (
         <Table>
           <THead>
