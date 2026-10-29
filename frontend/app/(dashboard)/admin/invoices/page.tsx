@@ -1,13 +1,13 @@
 'use client';
 import { useState } from 'react';
 import {
-  useGetInvoicesQuery,
   useApproveInvoiceMutation,
   useRejectInvoiceMutation,
   useAdminDeleteInvoiceMutation,
   useAdminUpdateInvoiceMutation,
   Invoice,
 } from '@/lib/api/invoicesApi';
+import { useOfflineInvoices } from '@/lib/offline/useOfflineInvoices';
 import { useGetActiveVendorsQuery } from '@/lib/api/vendorsApi';
 import { StatusStamp } from '@/components/status-stamp';
 import {
@@ -40,9 +40,7 @@ const REJECTION_OPTIONS = REJECTION_REASONS.map((r) => ({ value: r, label: r }))
 export default function AdminInvoicesPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
-  const { data: result, isLoading } = useGetInvoicesQuery({ status: statusFilter || undefined, page });
-  const invoices = result?.data ?? [];
-  const total = result?.total ?? 0;
+  const { invoices, total, isLoading, isOffline } = useOfflineInvoices({ status: statusFilter || undefined, page });
   const { data: vendors = [] } = useGetActiveVendorsQuery();
   const [approve]     = useApproveInvoiceMutation();
   const [reject]      = useRejectInvoiceMutation();
@@ -141,7 +139,7 @@ export default function AdminInvoicesPage() {
       {isLoading ? (
         <TableLoading />
       ) : invoices.length === 0 ? (
-        <TableEmpty message="No invoices found." />
+        <TableEmpty message={isOffline ? "You're offline — no cached invoices to show." : 'No invoices found.'} />
       ) : (
         <Table>
           <THead>

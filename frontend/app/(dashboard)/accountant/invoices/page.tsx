@@ -1,12 +1,12 @@
 'use client';
 import { useState } from 'react';
 import {
-  useGetInvoicesQuery,
   useApproveInvoiceMutation,
   useRejectInvoiceMutation,
   useVoidInvoiceMutation,
   Invoice,
 } from '@/lib/api/invoicesApi';
+import { useOfflineInvoices } from '@/lib/offline/useOfflineInvoices';
 import { StatusStamp } from '@/components/status-stamp';
 import {
   Button, Input, Select, Textarea, NativeSelect, Modal,
@@ -37,9 +37,7 @@ const REJECTION_OPTIONS = REJECTION_REASONS.map((r) => ({ value: r, label: r }))
 export default function AccountantInvoicesPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
-  const { data: result, isLoading } = useGetInvoicesQuery({ status: statusFilter || undefined, page });
-  const invoices = result?.data ?? [];
-  const total = result?.total ?? 0;
+  const { invoices, total, isLoading, isOffline } = useOfflineInvoices({ status: statusFilter || undefined, page });
   const [approve] = useApproveInvoiceMutation();
   const [reject]  = useRejectInvoiceMutation();
   const [voidInvoice] = useVoidInvoiceMutation();
@@ -104,7 +102,7 @@ export default function AccountantInvoicesPage() {
       {isLoading ? (
         <TableLoading />
       ) : invoices.length === 0 ? (
-        <TableEmpty message="No invoices found." />
+        <TableEmpty message={isOffline ? "You're offline — no cached invoices to show." : 'No invoices found.'} />
       ) : (
         <Table>
           <THead>

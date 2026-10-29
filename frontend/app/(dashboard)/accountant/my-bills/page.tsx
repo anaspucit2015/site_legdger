@@ -1,7 +1,8 @@
 'use client';
 import { useState } from 'react';
-import { useGetBillsQuery, useRequestDeleteBillMutation, Bill } from '@/lib/api/billsApi';
-import { useGetActiveSitesQuery } from '@/lib/api/sitesApi';
+import { useRequestDeleteBillMutation, Bill } from '@/lib/api/billsApi';
+import { useOfflineBills } from '@/lib/offline/useOfflineBills';
+import { useActiveSitesWithOfflineFallback } from '@/lib/offline/useActiveSitesWithOfflineFallback';
 import { StatusStamp } from '@/components/status-stamp';
 import { BillDetailModal } from '@/components/bill-detail-modal';
 import {
@@ -20,7 +21,7 @@ const STATUS_OPTIONS = [
 ];
 
 export default function AccountantMyBillsPage() {
-  const { data: sites = [] } = useGetActiveSitesQuery();
+  const sites = useActiveSitesWithOfflineFallback();
   const [siteFilter, setSiteFilter]     = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [viewTarget, setViewTarget]     = useState<Bill | null>(null);
@@ -40,14 +41,12 @@ export default function AccountantMyBillsPage() {
     setInfoTarget({ bill, top: rect.top - 8, left: rect.right + 8 });
   }
 
-  const { data: result, isLoading } = useGetBillsQuery({
+  const { bills, total, isLoading, isOffline } = useOfflineBills({
     mine: true,
     ...(siteFilter   ? { siteId:  siteFilter   } : {}),
     ...(statusFilter ? { status: statusFilter } : {}),
     page,
   });
-  const bills = result?.data ?? [];
-  const total = result?.total ?? 0;
 
   const siteOptions = sites.map((s) => ({ value: s.id, label: s.name }));
   const totalAmount = bills.reduce((s, b) => s + Number(b.totalAmount), 0);
@@ -89,7 +88,7 @@ export default function AccountantMyBillsPage() {
       {isLoading ? (
         <TableLoading />
       ) : bills.length === 0 ? (
-        <TableEmpty message="No bills found." />
+        <TableEmpty message={isOffline ? "You're offline — no cached bills to show." : 'No bills found.'} />
       ) : (
         <Table>
           <THead>

@@ -5,7 +5,9 @@ import { useState } from 'react';
 import { getUser, clearAuth } from '@/lib/auth';
 import { store } from '@/lib/store';
 import { baseApi } from '@/lib/api/baseApi';
+import { clearOfflineCache } from '@/lib/db/offlineDb';
 import { AuthGuard } from '@/components/auth-guard';
+import { OfflineIndicator } from '@/components/offline-indicator';
 import { Logo } from '@/components/logo';
 import {
   FileText, Trash2, ListChecks, MapPin, Users,
@@ -256,7 +258,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </div>
             </div>
             <button
-              onClick={() => { clearAuth(); store.dispatch(baseApi.util.resetApiState()); router.replace('/login'); }}
+              onClick={() => { clearAuth(); void clearOfflineCache(); store.dispatch(baseApi.util.resetApiState()); router.replace('/login'); }}
               className="flex items-center gap-2 px-3 py-2 w-full rounded-lg text-sm transition-all cursor-pointer"
               style={{ color: 'rgba(255,255,255,0.45)', fontFamily: 'var(--font-body)' }}
               onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}
@@ -270,7 +272,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* Main */}
         <main className="flex-1 overflow-y-auto" style={{ background: 'var(--paper)' }}>
-          <div className="p-8">{children}</div>
+          <div className="p-8">
+            <OfflineIndicator />
+            {children}
+          </div>
         </main>
       </div>
     </AuthGuard>

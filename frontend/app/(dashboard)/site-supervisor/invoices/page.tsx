@@ -1,7 +1,8 @@
 'use client';
 import { useState } from 'react';
-import { useGetActiveSitesQuery } from '@/lib/api/sitesApi';
-import { useGetInvoicesQuery, Invoice } from '@/lib/api/invoicesApi';
+import { Invoice } from '@/lib/api/invoicesApi';
+import { useOfflineInvoices } from '@/lib/offline/useOfflineInvoices';
+import { useActiveSitesWithOfflineFallback } from '@/lib/offline/useActiveSitesWithOfflineFallback';
 import { StatusStamp } from '@/components/status-stamp';
 import { InvoiceDetailModal } from '@/components/invoice-detail-modal';
 import {
@@ -19,16 +20,14 @@ const STATUS_OPTIONS = [
 ];
 
 export default function SiteSupervisorInvoicesPage() {
-  const { data: sites = [] } = useGetActiveSitesQuery();
+  const sites = useActiveSitesWithOfflineFallback();
   const [selectedSite, setSelectedSite]     = useState('');
   const [statusFilter, setStatusFilter]     = useState('');
   const [page, setPage] = useState(1);
-  const { data: result, isLoading } = useGetInvoicesQuery(
+  const { invoices, total, isLoading, isOffline } = useOfflineInvoices(
     { siteId: selectedSite, ...(statusFilter ? { status: statusFilter } : {}), page },
     { skip: !selectedSite },
   );
-  const invoices = result?.data ?? [];
-  const total = result?.total ?? 0;
   const [viewTarget, setViewTarget] = useState<Invoice | null>(null);
 
   const siteOptions = sites.map((s) => ({ value: s.id, label: s.name }));
@@ -61,7 +60,7 @@ export default function SiteSupervisorInvoicesPage() {
       ) : isLoading ? (
         <TableLoading />
       ) : invoices.length === 0 ? (
-        <TableEmpty message="No invoices submitted on this site yet." />
+        <TableEmpty message={isOffline ? "You're offline — no cached invoices for this site yet." : 'No invoices submitted on this site yet.'} />
       ) : (
         <Table>
           <THead>
