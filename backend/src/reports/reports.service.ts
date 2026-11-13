@@ -2,6 +2,121 @@ import { Injectable, NotFoundException } from '@nestjs/common'; // NotFoundExcep
 import * as ExcelJS from 'exceljs';
 import { PrismaService } from '../prisma/prisma.service';
 
+function tallyByStatus(rows: { status: string; amount?: any; totalAmount?: any }[]) {
+  const s = {
+    totalAmount: 0, approvedAmount: 0, pendingAmount: 0, rejectedAmount: 0, voidedAmount: 0,
+    totalCount: 0, approvedCount: 0, pendingCount: 0, rejectedCount: 0, voidedCount: 0,
+  };
+  for (const r of rows) {
+    const amt = Number(r.amount ?? r.totalAmount);
+    if (r.status === 'voided') { s.voidedAmount += amt; s.voidedCount++; continue; }
+    s.totalAmount += amt;
+    s.totalCount++;
+    if (r.status === 'approved') { s.approvedAmount += amt; s.approvedCount++; }
+    if (r.status === 'pending')  { s.pendingAmount  += amt; s.pendingCount++;  }
+    if (r.status === 'rejected') { s.rejectedAmount += amt; s.rejectedCount++; }
+  }
+  return s;
+}
+
+type AllBalancesRow = {
+  label: string;
+  name: string;
+  extra: string;
+  bankName?: string;
+  accountNumber?: string;
+  iban?: string;
+  currentBalance: number;
+  totalAmount: number;
+  approvedAmount: number;
+  pendingAmount: number;
+  rejectedAmount: number;
+  voidedAmount: number;
+  invoiceCount: number;
+  billCount: number;
+};
+
+function buildAllBalancesWorkbook(
+  sheetTitle: 'Sites' | 'Vendors',
+  labelHeader: string,
+  extraHeader: string,
+  rows: AllBalancesRow[],
+): Promise<ExcelJS.Buffer> {
+  const workbook   = new ExcelJS.Workbook();
+  workbook.creator = 'SiteLedger';
+  workbook.created = new Date();
+
+  const navyFill: ExcelJS.Fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1B2A4A' } };
+  const navyFont: Partial<ExcelJS.Font> = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+  const boldFont: Partial<ExcelJS.Font> = { bold: true };
+
+  const sheet = workbook.addWorksheet(sheetTitle, { pageSetup: { orientation: 'landscape', fitToPage: true } });
+  sheet.columns = [
+    { header: sheetTitle === 'Sites' ? 'Site Name' : 'Vendor Name', key: 'name',           width: 26 },
+    { header: labelHeader,                                          key: 'label',          width: 18 },
+    { header: extraHeader,                                          key: 'extra',          width: 22 },
+    ...(sheetTitle === 'Vendors' ? [
+      { header: 'Bank Name',                                        key: 'bankName',       width: 20 },
+      { header: 'Account Number',                                   key: 'accountNumber',  width: 20 },
+      { header: 'IBAN',                                              key: 'iban',           width: 24 },
+    ] : []),
+    { header: 'Opening Balance (PKR)',                              key: 'currentBalance', width: 18 },
+    { header: 'Approved (PKR)',                                     key: 'approvedAmount', width: 16 },
+    { header: 'Pending (PKR)',                                      key: 'pendingAmount',  width: 16 },
+    { header: 'Rejected (PKR)',                                     key: 'rejectedAmount', width: 16 },
+    { header: 'Voided (PKR)',                                       key: 'voidedAmount',   width: 16 },
+    { header: 'Grand Total (PKR)',                                  key: 'totalAmount',    width: 18 },
+    { header: 'Invoices',                                           key: 'invoiceCount',   width: 10 },
+    { header: 'Bills',                                              key: 'billCount',      width: 10 },
+  ];
+  sheet.getRow(1).eachCell((cell) => {
+    cell.fill = navyFill; cell.font = navyFont;
+    cell.alignment = { vertical: 'middle', horizontal: 'center' };
+    cell.border = { bottom: { style: 'thin', color: { argb: 'FFE8A33D' } } };
+  });
+  sheet.getRow(1).height = 22;
+
+  const moneyCols = ['currentBalance', 'approvedAmount', 'pendingAmount', 'rejectedAmount', 'voidedAmount', 'totalAmount'];
+  const totals = { currentBalance: 0, approvedAmount: 0, pendingAmount: 0, rejectedAmount: 0, voidedAmount: 0, totalAmount: 0, invoiceCount: 0, billCount: 0 };
+
+  rows.forEach((r, idx) => {
+    const row = sheet.addRow(r);
+    const rowBg = idx % 2 === 0 ? 'FFF8F9FA' : 'FFFFFFFF';
+    row.eachCell({ includeEmpty: true }, (cell) => { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowBg } }; cell.alignment = { vertical: 'middle' }; });
+    moneyCols.forEach((key) => {
+      const cell = row.getCell(key);
+      cell.numFmt = '#,##0';
+      cell.alignment = { horizontal: 'right', vertical: 'middle' };
+    });
+    row.getCell('totalAmount').font = boldFont;
+    row.getCell('invoiceCount').alignment = { horizontal: 'center', vertical: 'middle' };
+    row.getCell('billCount').alignment    = { horizontal: 'center', vertical: 'middle' };
+
+    totals.currentBalance += r.currentBalance;
+    totals.approvedAmount += r.approvedAmount;
+    totals.pendingAmount  += r.pendingAmount;
+    totals.rejectedAmount += r.rejectedAmount;
+    totals.voidedAmount   += r.voidedAmount;
+    totals.totalAmount    += r.totalAmount;
+    totals.invoiceCount   += r.invoiceCount;
+    totals.billCount      += r.billCount;
+  });
+
+  const totalRow = sheet.addRow({ name: 'TOTAL', ...totals });
+  totalRow.eachCell({ includeEmpty: true }, (cell) => { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8F4F8' } }; cell.font = boldFont; cell.alignment = { vertical: 'middle' }; });
+  moneyCols.forEach((key) => {
+    const cell = totalRow.getCell(key);
+    cell.numFmt = '#,##0';
+    cell.alignment = { horizontal: 'right', vertical: 'middle' };
+  });
+  totalRow.getCell('invoiceCount').alignment = { horizontal: 'center', vertical: 'middle' };
+  totalRow.getCell('billCount').alignment    = { horizontal: 'center', vertical: 'middle' };
+
+  sheet.views = [{ state: 'frozen', ySplit: 1 }];
+
+  return workbook.xlsx.writeBuffer();
+}
+
 @Injectable()
 export class ReportsService {
   constructor(private prisma: PrismaService) {}
@@ -379,14 +494,19 @@ export class ReportsService {
     // Resolve entity name and opening balance
     let entityName = 'Unknown';
     let openingBalance = 0;
+    let vendorBankDetails: { bankName: string | null; accountNumber: string | null; iban: string | null } | null = null;
     if (filter.siteId) {
       const site = await this.prisma.site.findUnique({ where: { id: filter.siteId }, select: { name: true, currentBalance: true } });
       entityName = site?.name ?? filter.siteId;
       openingBalance = Number(site?.currentBalance ?? 0);
     } else if (filter.vendorId) {
-      const vendor = await this.prisma.vendor.findUnique({ where: { id: filter.vendorId }, select: { name: true, currentBalance: true } });
+      const vendor = await this.prisma.vendor.findUnique({
+        where: { id: filter.vendorId },
+        select: { name: true, currentBalance: true, bankName: true, accountNumber: true, iban: true },
+      });
       entityName = vendor?.name ?? filter.vendorId;
       openingBalance = Number(vendor?.currentBalance ?? 0);
+      vendorBankDetails = vendor ? { bankName: vendor.bankName, accountNumber: vendor.accountNumber, iban: vendor.iban } : null;
     }
 
     // Vendor name map
@@ -483,6 +603,21 @@ export class ReportsService {
     sum_sheet.mergeCells('A1:C1');
     titleRow.getCell(1).alignment = { horizontal: 'left', vertical: 'middle' };
     sum_sheet.addRow([]);
+
+    // Vendor bank details
+    if (vendorBankDetails && (vendorBankDetails.bankName || vendorBankDetails.accountNumber || vendorBankDetails.iban)) {
+      const addBankRow = (label: string, value: string | null) => {
+        if (!value) return;
+        const r = sum_sheet.addRow([label, value, '']);
+        r.eachCell({ includeEmpty: true }, (c) => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8F9FA' } }; c.alignment = { vertical: 'middle' }; });
+        r.getCell(1).font = boldFont;
+        r.height = 18;
+      };
+      addBankRow('Bank Name',      vendorBankDetails.bankName);
+      addBankRow('Account Number', vendorBankDetails.accountNumber);
+      addBankRow('IBAN',           vendorBankDetails.iban);
+      sum_sheet.addRow([]);
+    }
 
     // Opening balance
     const openingRow = sum_sheet.addRow([`Opening Balance`, openingBalance, '']);
@@ -613,6 +748,90 @@ export class ReportsService {
     bill_sheet.views = [{ state: 'frozen', ySplit: 1 }];
 
     return workbook.xlsx.writeBuffer();
+  }
+
+  async generateAllSitesBalanceReport(): Promise<ExcelJS.Buffer> {
+    const sites = await this.prisma.site.findMany({
+      where: { isActive: true, isArchived: false },
+      select: { id: true, siteCode: true, name: true, location: true, currentBalance: true },
+      orderBy: { name: 'asc' },
+    });
+
+    if (sites.length === 0) {
+      throw new NotFoundException('No active sites found.');
+    }
+
+    const siteIds = sites.map((s) => s.id);
+    const [invoices, bills] = await Promise.all([
+      this.prisma.invoice.findMany({ where: { siteId: { in: siteIds } }, select: { siteId: true, status: true, amount: true } }),
+      this.prisma.bill.findMany({    where: { siteId: { in: siteIds } }, select: { siteId: true, status: true, totalAmount: true } }),
+    ]);
+
+    const rows = sites.map((site) => {
+      const inv  = tallyByStatus(invoices.filter((i) => i.siteId === site.id));
+      const bill = tallyByStatus(bills.filter((b) => b.siteId === site.id));
+      const currentBalance = Number(site.currentBalance);
+      return {
+        label:          `S-${String(site.siteCode).padStart(3, '0')}`,
+        name:           site.name,
+        extra:          site.location,
+        currentBalance,
+        totalAmount:    inv.totalAmount + bill.totalAmount + currentBalance,
+        approvedAmount: inv.approvedAmount + bill.approvedAmount,
+        pendingAmount:  inv.pendingAmount  + bill.pendingAmount,
+        rejectedAmount: inv.rejectedAmount + bill.rejectedAmount,
+        voidedAmount:   inv.voidedAmount   + bill.voidedAmount,
+        invoiceCount:   inv.totalCount,
+        billCount:      bill.totalCount,
+      };
+    });
+
+    return buildAllBalancesWorkbook('Sites', 'Site Code', 'Location', rows);
+  }
+
+  async generateAllVendorsBalanceReport(): Promise<ExcelJS.Buffer> {
+    const vendors = await this.prisma.vendor.findMany({
+      where: { isActive: true, isArchived: false },
+      select: {
+        id: true, name: true, contactPerson: true, phone: true, currentBalance: true,
+        bankName: true, accountNumber: true, iban: true,
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    if (vendors.length === 0) {
+      throw new NotFoundException('No active vendors found.');
+    }
+
+    const vendorIds = vendors.map((v) => v.id);
+    const [invoices, bills] = await Promise.all([
+      this.prisma.invoice.findMany({ where: { vendorId: { in: vendorIds } }, select: { vendorId: true, status: true, amount: true } }),
+      this.prisma.bill.findMany({    where: { vendorId: { in: vendorIds } }, select: { vendorId: true, status: true, totalAmount: true } }),
+    ]);
+
+    const rows = vendors.map((vendor) => {
+      const inv  = tallyByStatus(invoices.filter((i) => i.vendorId === vendor.id));
+      const bill = tallyByStatus(bills.filter((b) => b.vendorId === vendor.id));
+      const currentBalance = Number(vendor.currentBalance);
+      return {
+        label:          vendor.contactPerson ?? '—',
+        name:           vendor.name,
+        extra:          vendor.phone ?? '—',
+        bankName:       vendor.bankName ?? '—',
+        accountNumber:  vendor.accountNumber ?? '—',
+        iban:           vendor.iban ?? '—',
+        currentBalance,
+        totalAmount:    inv.totalAmount + bill.totalAmount + currentBalance,
+        approvedAmount: inv.approvedAmount + bill.approvedAmount,
+        pendingAmount:  inv.pendingAmount  + bill.pendingAmount,
+        rejectedAmount: inv.rejectedAmount + bill.rejectedAmount,
+        voidedAmount:   inv.voidedAmount   + bill.voidedAmount,
+        invoiceCount:   inv.totalCount,
+        billCount:      bill.totalCount,
+      };
+    });
+
+    return buildAllBalancesWorkbook('Vendors', 'Contact Person', 'Phone', rows);
   }
 
   async generateInvoiceReport(filters: {

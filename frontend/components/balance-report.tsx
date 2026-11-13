@@ -99,6 +99,9 @@ export function BalanceReport({ type }: Props) {
   const [downloading,   setDownloading]   = useState(false);
   const [downloadError, setDownloadError] = useState('');
 
+  const [downloadingAll,   setDownloadingAll]   = useState(false);
+  const [downloadAllError, setDownloadAllError] = useState('');
+
   const [editBalanceOpen,   setEditBalanceOpen]   = useState(false);
   const [editBalanceValue,  setEditBalanceValue]  = useState('');
   const [editBalanceSaving, setEditBalanceSaving] = useState(false);
@@ -197,6 +200,38 @@ export function BalanceReport({ type }: Props) {
     }
   }
 
+  async function handleDownloadAll() {
+    setDownloadAllError('');
+    setDownloadingAll(true);
+    try {
+      const base = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+      const res = await fetch(
+        `${base}/reports/balance/${type === 'site' ? 'sites' : 'vendors'}`,
+        { headers: { Authorization: `Bearer ${getToken()}` } },
+      );
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setDownloadAllError(body?.message ?? 'Failed to generate report.');
+        return;
+      }
+
+      const blob = await res.blob();
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href     = url;
+      a.download = `all-${type === 'site' ? 'sites' : 'vendors'}-balance-report-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      setDownloadAllError('Failed to generate report.');
+    } finally {
+      setDownloadingAll(false);
+    }
+  }
+
   async function handleSaveBalance() {
     const val = parseFloat(editBalanceValue);
     if (isNaN(val) || val < 0) return;
@@ -221,6 +256,17 @@ export function BalanceReport({ type }: Props) {
           type === 'site'
             ? 'Select a site to view its complete financial balance report'
             : 'Select a vendor to view its complete financial balance report'
+        }
+        action={
+          <div className="flex flex-col items-end gap-1.5">
+            <Button variant="outline" loading={downloadingAll} onClick={handleDownloadAll}>
+              <Download size={14} />
+              {downloadingAll ? 'Generating…' : `Download All ${type === 'site' ? 'Sites' : 'Vendors'} Report`}
+            </Button>
+            {downloadAllError && (
+              <p className="text-xs" style={{ color: 'var(--rust)' }}>{downloadAllError}</p>
+            )}
+          </div>
         }
       />
 

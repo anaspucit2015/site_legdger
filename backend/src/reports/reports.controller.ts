@@ -35,6 +35,24 @@ export class ReportsController {
     res.send(buffer);
   }
 
+  @Get('balance/sites')
+  async downloadAllSitesBalanceReport(@Res() res: Response) {
+    const buffer = await this.reportsService.generateAllSitesBalanceReport();
+    const filename = `sites-balance-report-${new Date().toISOString().slice(0, 10)}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(buffer);
+  }
+
+  @Get('balance/vendors')
+  async downloadAllVendorsBalanceReport(@Res() res: Response) {
+    const buffer = await this.reportsService.generateAllVendorsBalanceReport();
+    const filename = `vendors-balance-report-${new Date().toISOString().slice(0, 10)}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(buffer);
+  }
+
   @Get('combined')
   async downloadCombinedReport(
     @Query('siteId')       siteId:       string | undefined,
