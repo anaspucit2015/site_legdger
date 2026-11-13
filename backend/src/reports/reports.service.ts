@@ -23,6 +23,9 @@ type AllBalancesRow = {
   label: string;
   name: string;
   extra: string;
+  bankName?: string;
+  accountNumber?: string;
+  iban?: string;
   currentBalance: number;
   totalAmount: number;
   approvedAmount: number;
@@ -52,6 +55,11 @@ function buildAllBalancesWorkbook(
     { header: sheetTitle === 'Sites' ? 'Site Name' : 'Vendor Name', key: 'name',           width: 26 },
     { header: labelHeader,                                          key: 'label',          width: 18 },
     { header: extraHeader,                                          key: 'extra',          width: 22 },
+    ...(sheetTitle === 'Vendors' ? [
+      { header: 'Bank Name',                                        key: 'bankName',       width: 20 },
+      { header: 'Account Number',                                   key: 'accountNumber',  width: 20 },
+      { header: 'IBAN',                                              key: 'iban',           width: 24 },
+    ] : []),
     { header: 'Opening Balance (PKR)',                              key: 'currentBalance', width: 18 },
     { header: 'Approved (PKR)',                                     key: 'approvedAmount', width: 16 },
     { header: 'Pending (PKR)',                                      key: 'pendingAmount',  width: 16 },
@@ -486,14 +494,19 @@ export class ReportsService {
     // Resolve entity name and opening balance
     let entityName = 'Unknown';
     let openingBalance = 0;
+    let vendorBankDetails: { bankName: string | null; accountNumber: string | null; iban: string | null } | null = null;
     if (filter.siteId) {
       const site = await this.prisma.site.findUnique({ where: { id: filter.siteId }, select: { name: true, currentBalance: true } });
       entityName = site?.name ?? filter.siteId;
       openingBalance = Number(site?.currentBalance ?? 0);
     } else if (filter.vendorId) {
-      const vendor = await this.prisma.vendor.findUnique({ where: { id: filter.vendorId }, select: { name: true, currentBalance: true } });
+      const vendor = await this.prisma.vendor.findUnique({
+        where: { id: filter.vendorId },
+        select: { name: true, currentBalance: true, bankName: true, accountNumber: true, iban: true },
+      });
       entityName = vendor?.name ?? filter.vendorId;
       openingBalance = Number(vendor?.currentBalance ?? 0);
+      vendorBankDetails = vendor ? { bankName: vendor.bankName, accountNumber: vendor.accountNumber, iban: vendor.iban } : null;
     }
 
     // Vendor name map
@@ -590,6 +603,21 @@ export class ReportsService {
     sum_sheet.mergeCells('A1:C1');
     titleRow.getCell(1).alignment = { horizontal: 'left', vertical: 'middle' };
     sum_sheet.addRow([]);
+
+    // Vendor bank details
+    if (vendorBankDetails && (vendorBankDetails.bankName || vendorBankDetails.accountNumber || vendorBankDetails.iban)) {
+      const addBankRow = (label: string, value: string | null) => {
+        if (!value) return;
+        const r = sum_sheet.addRow([label, value, '']);
+        r.eachCell({ includeEmpty: true }, (c) => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8F9FA' } }; c.alignment = { vertical: 'middle' }; });
+        r.getCell(1).font = boldFont;
+        r.height = 18;
+      };
+      addBankRow('Bank Name',      vendorBankDetails.bankName);
+      addBankRow('Account Number', vendorBankDetails.accountNumber);
+      addBankRow('IBAN',           vendorBankDetails.iban);
+      sum_sheet.addRow([]);
+    }
 
     // Opening balance
     const openingRow = sum_sheet.addRow([`Opening Balance`, openingBalance, '']);
@@ -764,7 +792,10 @@ export class ReportsService {
   async generateAllVendorsBalanceReport(): Promise<ExcelJS.Buffer> {
     const vendors = await this.prisma.vendor.findMany({
       where: { isActive: true, isArchived: false },
-      select: { id: true, name: true, contactPerson: true, phone: true, currentBalance: true },
+      select: {
+        id: true, name: true, contactPerson: true, phone: true, currentBalance: true,
+        bankName: true, accountNumber: true, iban: true,
+      },
       orderBy: { name: 'asc' },
     });
 
@@ -786,6 +817,9 @@ export class ReportsService {
         label:          vendor.contactPerson ?? '—',
         name:           vendor.name,
         extra:          vendor.phone ?? '—',
+        bankName:       vendor.bankName ?? '—',
+        accountNumber:  vendor.accountNumber ?? '—',
+        iban:           vendor.iban ?? '—',
         currentBalance,
         totalAmount:    inv.totalAmount + bill.totalAmount + currentBalance,
         approvedAmount: inv.approvedAmount + bill.approvedAmount,
