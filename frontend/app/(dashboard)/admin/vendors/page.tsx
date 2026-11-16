@@ -486,7 +486,7 @@ export default function AdminVendorsPage() {
               type="number"
               min="0"
               step="0.01"
-              value={editTarget ? String(editTarget.currentBalance) : form.currentBalance}
+              value={editTarget ? String(editTarget.openingBalance) : form.currentBalance}
               onChange={(e) => setForm({ ...form, currentBalance: e.target.value })}
               placeholder="e.g. 50000"
               disabled={!!editTarget}
