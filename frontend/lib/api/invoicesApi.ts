@@ -17,6 +17,9 @@ export type BalanceSubSummary = {
 
 export type BalanceSummary = BalanceSubSummary & {
   currentBalance: number;
+  openingBalance: number;
+  advanceBalance?: number;
+  totalToDate:    number;
   invoices: BalanceSubSummary;
   bills:    BalanceSubSummary;
 };

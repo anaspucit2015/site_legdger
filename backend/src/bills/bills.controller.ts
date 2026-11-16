@@ -115,9 +115,9 @@ export class BillsController {
     return this.billsService.reject(id, dto, req.user.id);
   }
 
-  // ─── Admin: void approved bill ────────────────────────────────────────────
+  // ─── Admin/accountant: void approved bill ─────────────────────────────────
   @UseGuards(RolesGuard)
-  @Roles('admin')
+  @Roles('admin', 'accountant')
   @Post(':id/void')
   voidBill(@Param('id') id: string, @Body() dto: VoidBillDto, @Req() req: any) {
     return this.billsService.void(id, dto, req.user.id);

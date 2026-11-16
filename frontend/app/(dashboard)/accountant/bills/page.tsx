@@ -56,6 +56,7 @@ export default function AccountantBillsPage() {
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [voiding,     setVoiding]     = useState(false);
+  const [voidError,  setVoidError]   = useState('');
 
   async function handleApprove(id: string) {
     setApprovingId(id);
@@ -78,10 +79,13 @@ export default function AccountantBillsPage() {
   async function handleVoidSubmit() {
     if (!voidTarget || !voidReason) return;
     setVoiding(true);
+    setVoidError('');
     try {
-      await voidBill({ id: voidTarget.id, reason: voidReason });
+      await voidBill({ id: voidTarget.id, reason: voidReason }).unwrap();
       setVoidTarget(null);
       setVoidReason('');
+    } catch (err: any) {
+      setVoidError(err?.data?.message ?? 'Failed to void bill.');
     } finally {
       setVoiding(false);
     }
@@ -220,7 +224,7 @@ export default function AccountantBillsPage() {
 
       <Modal
         open={!!voidTarget}
-        onClose={() => { setVoidTarget(null); setVoidReason(''); }}
+        onClose={() => { setVoidTarget(null); setVoidReason(''); setVoidError(''); }}
         title="Void Bill"
         subtitle={voidTarget ? `${voidTarget.site?.name} · ${voidTarget.vendor?.name ?? 'No vendor'} · Rs. ${Number(voidTarget.totalAmount).toLocaleString()}` : undefined}
       >
@@ -235,8 +239,11 @@ export default function AccountantBillsPage() {
             onChange={(e) => setVoidReason(e.target.value)}
             placeholder="e.g. Bill submitted in error"
           />
+          {voidError && (
+            <p className="text-sm" style={{ color: 'var(--rust)' }}>{voidError}</p>
+          )}
           <div className="flex gap-3 justify-end">
-            <Button variant="outline" disabled={voiding} onClick={() => setVoidTarget(null)}>Cancel</Button>
+            <Button variant="outline" disabled={voiding} onClick={() => { setVoidTarget(null); setVoidError(''); }}>Cancel</Button>
             <Button
               loading={voiding}
               disabled={!voidReason}

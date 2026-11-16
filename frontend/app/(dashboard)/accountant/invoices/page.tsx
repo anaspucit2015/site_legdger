@@ -53,6 +53,7 @@ export default function AccountantInvoicesPage() {
   const [approvingId,  setApprovingId]  = useState<string | null>(null);
   const [rejectingId,  setRejectingId]  = useState<string | null>(null);
   const [voiding,      setVoiding]      = useState(false);
+  const [voidError,    setVoidError]    = useState('');
 
   async function handleApprove(id: string) {
     setApprovingId(id);
@@ -75,10 +76,13 @@ export default function AccountantInvoicesPage() {
   async function handleVoidSubmit() {
     if (!voidTarget || !voidReason) return;
     setVoiding(true);
+    setVoidError('');
     try {
-      await voidInvoice({ id: voidTarget.id, reason: voidReason });
+      await voidInvoice({ id: voidTarget.id, reason: voidReason }).unwrap();
       setVoidTarget(null);
       setVoidReason('');
+    } catch (err: any) {
+      setVoidError(err?.data?.message ?? 'Failed to void invoice.');
     } finally {
       setVoiding(false);
     }
@@ -221,7 +225,7 @@ export default function AccountantInvoicesPage() {
 
       <Modal
         open={!!voidTarget}
-        onClose={() => { setVoidTarget(null); setVoidReason(''); }}
+        onClose={() => { setVoidTarget(null); setVoidReason(''); setVoidError(''); }}
         title="Void Invoice"
         subtitle={voidTarget ? `${voidTarget.site?.name} · ${voidTarget.task?.name ?? voidTarget.customTaskName} · Rs. ${Number(voidTarget.amount).toLocaleString()}` : undefined}
       >
@@ -236,8 +240,11 @@ export default function AccountantInvoicesPage() {
             onChange={(e) => setVoidReason(e.target.value)}
             placeholder="e.g. Invoice submitted in error"
           />
+          {voidError && (
+            <p className="text-sm" style={{ color: 'var(--rust)' }}>{voidError}</p>
+          )}
           <div className="flex gap-3 justify-end">
-            <Button variant="outline" disabled={voiding} onClick={() => setVoidTarget(null)}>Cancel</Button>
+            <Button variant="outline" disabled={voiding} onClick={() => { setVoidTarget(null); setVoidError(''); }}>Cancel</Button>
             <Button
               loading={voiding}
               disabled={!voidReason}

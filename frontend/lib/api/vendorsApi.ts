@@ -13,6 +13,7 @@ export type Vendor = {
   accountNumber: string | null;
   iban: string | null;
   branchCode: string | null;
+  openingBalance: string;
   currentBalance: string;
   advanceBalance: string;
   isActive: boolean;
@@ -103,7 +104,7 @@ export const vendorsApi = baseApi.injectEndpoints({
       query: (body) => ({ url: '/vendors', method: 'POST', body }),
       invalidatesTags: ['Vendor'],
     }),
-    updateVendor: build.mutation<Vendor, { id: string; name?: string; contactPerson?: string; phone?: string; email?: string; address?: string; bankName?: string; accountTitle?: string; accountNumber?: string; iban?: string; branchCode?: string; currentBalance?: number; isActive?: boolean }>({
+    updateVendor: build.mutation<Vendor, { id: string; name?: string; contactPerson?: string; phone?: string; email?: string; address?: string; bankName?: string; accountTitle?: string; accountNumber?: string; iban?: string; branchCode?: string; openingBalance?: number; isActive?: boolean }>({
       query: ({ id, ...body }) => ({ url: `/vendors/${id}`, method: 'PATCH', body }),
       invalidatesTags: ['Vendor', 'Invoice'],
     }),

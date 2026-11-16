@@ -26,7 +26,8 @@ export class UpdateVendorDto {
   @IsOptional() @IsString() accountNumber?: string;
   @IsOptional() @IsString() iban?: string;
   @IsOptional() @IsString() branchCode?: string;
-  @IsOptional() @IsNumber() currentBalance?: number;
+  @IsOptional() @IsNumber() openingBalance?: number;
+  @IsOptional() @IsString() reason?: string;
   @IsOptional() isActive?: boolean;
 }
 

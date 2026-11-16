@@ -48,8 +48,8 @@ export class VendorsController {
   @UseGuards(RolesGuard)
   @Roles('admin', 'accountant')
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: UpdateVendorDto) {
-    return this.vendorsService.update(id, dto);
+  update(@Param('id') id: string, @Body() dto: UpdateVendorDto, @Req() req: any) {
+    return this.vendorsService.update(id, dto, req.user.id);
   }
 
   @UseGuards(RolesGuard)
@@ -103,5 +103,16 @@ export class VendorsController {
   @Get(':id/statement')
   getStatement(@Param('id') id: string) {
     return this.vendorsService.getStatement(id);
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles('admin', 'accountant')
+  @Get(':id/balance-adjustments')
+  getBalanceAdjustments(
+    @Param('id') id: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.vendorsService.getBalanceAdjustments(id, Number(page) || 1, Number(limit) || 20);
   }
 }

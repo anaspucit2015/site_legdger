@@ -7,6 +7,7 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 import { SitesService } from './sites.service';
@@ -48,8 +49,19 @@ export class SitesController {
   @UseGuards(RolesGuard)
   @Roles('admin', 'accountant')
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: UpdateSiteDto) {
-    return this.sitesService.update(id, dto);
+  update(@Param('id') id: string, @Body() dto: UpdateSiteDto, @Req() req: any) {
+    return this.sitesService.update(id, dto, req.user.id);
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles('admin', 'accountant')
+  @Get(':id/balance-adjustments')
+  getBalanceAdjustments(
+    @Param('id') id: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.sitesService.getBalanceAdjustments(id, Number(page) || 1, Number(limit) || 20);
   }
 
   @UseGuards(RolesGuard)

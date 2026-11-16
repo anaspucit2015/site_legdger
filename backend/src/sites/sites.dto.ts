@@ -25,7 +25,11 @@ export class UpdateSiteDto {
   @IsOptional()
   @IsNumber()
   @Min(0)
-  currentBalance?: number;
+  openingBalance?: number;
+
+  @IsOptional()
+  @IsString()
+  reason?: string;
 
   @IsOptional()
   isActive?: boolean;

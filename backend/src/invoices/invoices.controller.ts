@@ -100,7 +100,7 @@ export class InvoicesController {
   }
 
   @UseGuards(RolesGuard)
-  @Roles('admin')
+  @Roles('admin', 'accountant')
   @Post(':id/void')
   voidInvoice(@Param('id') id: string, @Body() dto: VoidInvoiceDto, @Req() req: any) {
     return this.invoicesService.void(id, dto, req.user.id);

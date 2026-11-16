@@ -7,11 +7,15 @@ import {
 import { Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { PrismaService } from '../prisma/prisma.service';
+import { BalanceService } from '../balance/balance.service';
 import { CreateInvoiceDto, RejectInvoiceDto, UpdateInvoiceDto, VoidInvoiceDto } from './invoices.dto';
 
 @Injectable()
 export class InvoicesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private balanceService: BalanceService,
+  ) {}
 
   // ─── Create ────────────────────────────────────────────────────────────────
 
@@ -414,17 +418,22 @@ export class InvoicesService {
       ...(filter.vendorId && { vendorId: filter.vendorId }),
     };
 
-    const [invoices, bills, entity] = await Promise.all([
+    const [invoices, bills, site, vendor, totalToDate] = await Promise.all([
       this.prisma.invoice.findMany({ where, select: { status: true, amount: true } }),
       this.prisma.bill.findMany({ where, select: { status: true, totalAmount: true } }),
       filter.siteId
-        ? this.prisma.site.findUnique({ where: { id: filter.siteId }, select: { currentBalance: true } })
-        : filter.vendorId
-          ? this.prisma.vendor.findUnique({ where: { id: filter.vendorId }, select: { currentBalance: true } })
-          : Promise.resolve(null),
+        ? this.prisma.site.findUnique({ where: { id: filter.siteId }, select: { openingBalance: true, currentBalance: true } })
+        : Promise.resolve(null),
+      filter.vendorId
+        ? this.prisma.vendor.findUnique({ where: { id: filter.vendorId }, select: { openingBalance: true, currentBalance: true, advanceBalance: true } })
+        : Promise.resolve(null),
+      this.balanceService.getTotalToDate(filter),
     ]);
 
+    const entity = site ?? vendor;
     const currentBalance = Number(entity?.currentBalance ?? 0);
+    const openingBalance = Number(entity?.openingBalance ?? 0);
+    const advanceBalance = vendor ? Number(vendor.advanceBalance) : undefined;
 
     function tally(rows: { status: string; amount?: any; totalAmount?: any }[]) {
       const s = {
@@ -448,7 +457,14 @@ export class InvoicesService {
 
     return {
       currentBalance,
-      totalAmount:    inv.totalAmount    + bill.totalAmount    + currentBalance,
+      openingBalance,
+      advanceBalance,
+      // Computed fresh from Invoice/Bill tables -- openingBalance + every approved
+      // invoice + every approved bill. Does not read currentBalance or any ledger row.
+      totalToDate: totalToDate.toNumber(),
+      // currentBalance already reflects every approved invoice/bill (approval auto-credits it) --
+      // the live outstanding balance IS the total, not currentBalance + invoice/bill face values on top.
+      totalAmount:    currentBalance,
       approvedAmount: inv.approvedAmount + bill.approvedAmount,
       pendingAmount:  inv.pendingAmount  + bill.pendingAmount,
       rejectedAmount: inv.rejectedAmount + bill.rejectedAmount,

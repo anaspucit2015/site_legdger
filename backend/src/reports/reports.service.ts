@@ -26,8 +26,8 @@ type AllBalancesRow = {
   bankName?: string;
   accountNumber?: string;
   iban?: string;
+  openingBalance: number;
   currentBalance: number;
-  totalAmount: number;
   approvedAmount: number;
   pendingAmount: number;
   rejectedAmount: number;
@@ -60,12 +60,12 @@ function buildAllBalancesWorkbook(
       { header: 'Account Number',                                   key: 'accountNumber',  width: 20 },
       { header: 'IBAN',                                              key: 'iban',           width: 24 },
     ] : []),
-    { header: 'Opening Balance (PKR)',                              key: 'currentBalance', width: 18 },
+    { header: 'Opening Balance (PKR)',                              key: 'openingBalance', width: 18 },
+    { header: 'Outstanding Balance (PKR)',                          key: 'currentBalance', width: 20 },
     { header: 'Approved (PKR)',                                     key: 'approvedAmount', width: 16 },
     { header: 'Pending (PKR)',                                      key: 'pendingAmount',  width: 16 },
     { header: 'Rejected (PKR)',                                     key: 'rejectedAmount', width: 16 },
     { header: 'Voided (PKR)',                                       key: 'voidedAmount',   width: 16 },
-    { header: 'Grand Total (PKR)',                                  key: 'totalAmount',    width: 18 },
     { header: 'Invoices',                                           key: 'invoiceCount',   width: 10 },
     { header: 'Bills',                                              key: 'billCount',      width: 10 },
   ];
@@ -76,8 +76,8 @@ function buildAllBalancesWorkbook(
   });
   sheet.getRow(1).height = 22;
 
-  const moneyCols = ['currentBalance', 'approvedAmount', 'pendingAmount', 'rejectedAmount', 'voidedAmount', 'totalAmount'];
-  const totals = { currentBalance: 0, approvedAmount: 0, pendingAmount: 0, rejectedAmount: 0, voidedAmount: 0, totalAmount: 0, invoiceCount: 0, billCount: 0 };
+  const moneyCols = ['openingBalance', 'currentBalance', 'approvedAmount', 'pendingAmount', 'rejectedAmount', 'voidedAmount'];
+  const totals = { openingBalance: 0, currentBalance: 0, approvedAmount: 0, pendingAmount: 0, rejectedAmount: 0, voidedAmount: 0, invoiceCount: 0, billCount: 0 };
 
   rows.forEach((r, idx) => {
     const row = sheet.addRow(r);
@@ -88,16 +88,16 @@ function buildAllBalancesWorkbook(
       cell.numFmt = '#,##0';
       cell.alignment = { horizontal: 'right', vertical: 'middle' };
     });
-    row.getCell('totalAmount').font = boldFont;
+    row.getCell('currentBalance').font = boldFont;
     row.getCell('invoiceCount').alignment = { horizontal: 'center', vertical: 'middle' };
     row.getCell('billCount').alignment    = { horizontal: 'center', vertical: 'middle' };
 
+    totals.openingBalance += r.openingBalance;
     totals.currentBalance += r.currentBalance;
     totals.approvedAmount += r.approvedAmount;
     totals.pendingAmount  += r.pendingAmount;
     totals.rejectedAmount += r.rejectedAmount;
     totals.voidedAmount   += r.voidedAmount;
-    totals.totalAmount    += r.totalAmount;
     totals.invoiceCount   += r.invoiceCount;
     totals.billCount      += r.billCount;
   });
@@ -491,21 +491,24 @@ export class ReportsService {
       }),
     ]);
 
-    // Resolve entity name and opening balance
+    // Resolve entity name, opening balance (last manually-set baseline), and outstanding balance (live)
     let entityName = 'Unknown';
     let openingBalance = 0;
+    let outstandingBalance = 0;
     let vendorBankDetails: { bankName: string | null; accountNumber: string | null; iban: string | null } | null = null;
     if (filter.siteId) {
-      const site = await this.prisma.site.findUnique({ where: { id: filter.siteId }, select: { name: true, currentBalance: true } });
+      const site = await this.prisma.site.findUnique({ where: { id: filter.siteId }, select: { name: true, openingBalance: true, currentBalance: true } });
       entityName = site?.name ?? filter.siteId;
-      openingBalance = Number(site?.currentBalance ?? 0);
+      openingBalance = Number(site?.openingBalance ?? 0);
+      outstandingBalance = Number(site?.currentBalance ?? 0);
     } else if (filter.vendorId) {
       const vendor = await this.prisma.vendor.findUnique({
         where: { id: filter.vendorId },
-        select: { name: true, currentBalance: true, bankName: true, accountNumber: true, iban: true },
+        select: { name: true, openingBalance: true, currentBalance: true, bankName: true, accountNumber: true, iban: true },
       });
       entityName = vendor?.name ?? filter.vendorId;
-      openingBalance = Number(vendor?.currentBalance ?? 0);
+      openingBalance = Number(vendor?.openingBalance ?? 0);
+      outstandingBalance = Number(vendor?.currentBalance ?? 0);
       vendorBankDetails = vendor ? { bankName: vendor.bankName, accountNumber: vendor.accountNumber, iban: vendor.iban } : null;
     }
 
@@ -522,10 +525,12 @@ export class ReportsService {
     // Compute summaries
     function tally(rows: { status: string; amount?: any; totalAmount?: any }[]) {
       const s = { total: 0, paid: 0, approved: 0, pending: 0, rejected: 0,
-                  totalCount: rows.length, paidCount: 0, approvedCount: 0, pendingCount: 0, rejectedCount: 0 };
+                  totalCount: 0, paidCount: 0, approvedCount: 0, pendingCount: 0, rejectedCount: 0 };
       for (const r of rows) {
         const amt = Number(r.amount ?? r.totalAmount);
+        if (r.status === 'voided') continue; // voided rows never affected the balance -- exclude from the movement total
         s.total += amt;
+        s.totalCount++;
         if (r.status === 'paid')     { s.paid     += amt; s.paidCount++;     }
         if (r.status === 'approved') { s.approved += amt; s.approvedCount++; }
         if (r.status === 'pending')  { s.pending  += amt; s.pendingCount++;  }
@@ -541,7 +546,6 @@ export class ReportsService {
       approved: inv.approved + bill.approved, pending: inv.pending + bill.pending,
       rejected: inv.rejected + bill.rejected,
       totalCount: inv.totalCount + bill.totalCount,
-      grandTotal: inv.total + bill.total + openingBalance,
     };
 
     const workbook   = new ExcelJS.Workbook();
@@ -619,15 +623,26 @@ export class ReportsService {
       sum_sheet.addRow([]);
     }
 
-    // Opening balance
+    // Opening balance -- the last manually-set baseline (e.g. legacy balance carried forward),
+    // frozen until the next "Edit Balance" action. Informational: shows where the live balance started from.
     const openingRow = sum_sheet.addRow([`Opening Balance`, openingBalance, '']);
-    openingRow.eachCell({ includeEmpty: true }, (c) => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8F4F8' } }; c.alignment = { vertical: 'middle' }; });
+    openingRow.eachCell({ includeEmpty: true }, (c) => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8F9FA' } }; c.alignment = { vertical: 'middle' }; });
     openingRow.getCell(1).font = boldFont;
     openingRow.getCell(2).numFmt = '#,##0';
     openingRow.getCell(2).alignment = { horizontal: 'right', vertical: 'middle' };
     openingRow.height = 19;
 
-    // Invoices + bills movement total
+    // Outstanding balance -- already reflects every approved invoice/bill, payment, advance-applied
+    // and reversal since the opening balance above. This is the headline figure; it is NOT summed
+    // with "Invoices + Bills" below -- that row is informational detail only, since those same
+    // approved amounts are already included in this balance.
+    const outstandingRow = sum_sheet.addRow([`Outstanding Balance`, outstandingBalance, '']);
+    outstandingRow.eachCell({ includeEmpty: true }, (c) => { c.fill = navyFill; c.font = navyFont; c.alignment = { vertical: 'middle' }; });
+    outstandingRow.getCell(2).numFmt = '#,##0';
+    outstandingRow.getCell(2).alignment = { horizontal: 'right', vertical: 'middle' };
+    outstandingRow.height = 22;
+
+    // Invoices + bills (informational breakdown only; excludes voided rows)
     const movementRow = sum_sheet.addRow([`Invoices + Bills`, combined.total, combined.totalCount]);
     movementRow.eachCell({ includeEmpty: true }, (c) => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } }; c.alignment = { vertical: 'middle' }; });
     movementRow.getCell(1).font = boldFont;
@@ -635,14 +650,6 @@ export class ReportsService {
     movementRow.getCell(2).alignment = { horizontal: 'right', vertical: 'middle' };
     movementRow.getCell(3).alignment = { horizontal: 'center', vertical: 'middle' };
     movementRow.height = 19;
-
-    // Combined grand total (opening balance + invoices + bills)
-    const grandRow = sum_sheet.addRow([`Grand Total`, combined.grandTotal, combined.totalCount]);
-    grandRow.eachCell({ includeEmpty: true }, (c) => { c.fill = navyFill; c.font = navyFont; c.alignment = { vertical: 'middle' }; });
-    grandRow.getCell(2).numFmt = '#,##0';
-    grandRow.getCell(2).alignment = { horizontal: 'right', vertical: 'middle' };
-    grandRow.getCell(3).alignment = { horizontal: 'center', vertical: 'middle' };
-    grandRow.height = 22;
     sum_sheet.addRow([]);
 
     addSummaryBlock(sum_sheet, 'Invoices', inv);
@@ -753,7 +760,7 @@ export class ReportsService {
   async generateAllSitesBalanceReport(): Promise<ExcelJS.Buffer> {
     const sites = await this.prisma.site.findMany({
       where: { isActive: true, isArchived: false },
-      select: { id: true, siteCode: true, name: true, location: true, currentBalance: true },
+      select: { id: true, siteCode: true, name: true, location: true, openingBalance: true, currentBalance: true },
       orderBy: { name: 'asc' },
     });
 
@@ -775,8 +782,8 @@ export class ReportsService {
         label:          `S-${String(site.siteCode).padStart(3, '0')}`,
         name:           site.name,
         extra:          site.location,
+        openingBalance: Number(site.openingBalance),
         currentBalance,
-        totalAmount:    inv.totalAmount + bill.totalAmount + currentBalance,
         approvedAmount: inv.approvedAmount + bill.approvedAmount,
         pendingAmount:  inv.pendingAmount  + bill.pendingAmount,
         rejectedAmount: inv.rejectedAmount + bill.rejectedAmount,
@@ -793,7 +800,7 @@ export class ReportsService {
     const vendors = await this.prisma.vendor.findMany({
       where: { isActive: true, isArchived: false },
       select: {
-        id: true, name: true, contactPerson: true, phone: true, currentBalance: true,
+        id: true, name: true, contactPerson: true, phone: true, openingBalance: true, currentBalance: true,
         bankName: true, accountNumber: true, iban: true,
       },
       orderBy: { name: 'asc' },
@@ -820,8 +827,8 @@ export class ReportsService {
         bankName:       vendor.bankName ?? '—',
         accountNumber:  vendor.accountNumber ?? '—',
         iban:           vendor.iban ?? '—',
+        openingBalance: Number(vendor.openingBalance),
         currentBalance,
-        totalAmount:    inv.totalAmount + bill.totalAmount + currentBalance,
         approvedAmount: inv.approvedAmount + bill.approvedAmount,
         pendingAmount:  inv.pendingAmount  + bill.pendingAmount,
         rejectedAmount: inv.rejectedAmount + bill.rejectedAmount,

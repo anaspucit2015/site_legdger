@@ -7,7 +7,11 @@ export class SitesService {
   constructor(private prisma: PrismaService) {}
 
   create(dto: CreateSiteDto) {
-    return this.prisma.site.create({ data: dto });
+    // Opening balance is fixed at creation -- whatever starting balance is entered here
+    // becomes the permanent historical baseline, separate from the live currentBalance.
+    return this.prisma.site.create({
+      data: { ...dto, openingBalance: dto.currentBalance ?? 0 },
+    });
   }
 
   async findAll(page = 1, limit = 20) {
@@ -32,9 +36,51 @@ export class SitesService {
     return site;
   }
 
-  async update(id: string, dto: UpdateSiteDto) {
+  async update(id: string, dto: UpdateSiteDto, performedById: string) {
+    const existing = await this.findOne(id);
+
+    if (dto.openingBalance === undefined) {
+      return this.prisma.site.update({ where: { id }, data: dto });
+    }
+
+    // Edit Balance corrects the opening balance baseline -- this is what Total to date
+    // is computed from. The live currentBalance field is not touched here.
+    const { openingBalance, reason, ...rest } = dto;
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.site.update({
+        where: { id },
+        data: { ...rest, openingBalance },
+      });
+      await tx.balanceAdjustment.create({
+        data: {
+          entityType: 'SITE',
+          siteId: id,
+          previousOpeningBalance: existing.openingBalance,
+          newOpeningBalance: openingBalance,
+          previousCurrentBalance: existing.currentBalance,
+          newCurrentBalance: existing.currentBalance,
+          reason: reason ?? null,
+          performedById,
+        },
+      });
+      return updated;
+    });
+  }
+
+  async getBalanceAdjustments(id: string, page = 1, limit = 20) {
     await this.findOne(id);
-    return this.prisma.site.update({ where: { id }, data: dto });
+    const skip = (page - 1) * limit;
+    const [data, total] = await Promise.all([
+      this.prisma.balanceAdjustment.findMany({
+        where: { siteId: id },
+        include: { performedBy: { select: { name: true } } },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.balanceAdjustment.count({ where: { siteId: id } }),
+    ]);
+    return { data, total, page, limit };
   }
 
   private async checkNoOpenRecords(siteId: string) {

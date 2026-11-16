@@ -160,7 +160,7 @@ export default function AdminVendorsPage() {
     return !v.isArchived;
   });
 
-  const [form, setForm] = useState({ name: '', contactPerson: '', phone: '', email: '', address: '', bankName: '', accountTitle: '', accountNumber: '', iban: '', branchCode: '', currentBalance: '' });
+  const [form, setForm] = useState({ name: '', contactPerson: '', phone: '', email: '', address: '', bankName: '', accountTitle: '', accountNumber: '', iban: '', branchCode: '', openingBalance: '' });
   const [formError, setFormError] = useState('');
 
   const [advanceForm, setAdvanceForm] = useState({ amount: '', notes: '' });
@@ -182,9 +182,9 @@ export default function AdminVendorsPage() {
         ...(form.accountNumber  ? { accountNumber:  form.accountNumber }                   : {}),
         ...(form.iban           ? { iban:           form.iban }                            : {}),
         ...(form.branchCode     ? { branchCode:     form.branchCode }                      : {}),
-        ...(form.currentBalance ? { currentBalance: Number(form.currentBalance) }          : {}),
+        ...(form.openingBalance ? { currentBalance: Number(form.openingBalance) }          : {}),
       }).unwrap();
-      setForm({ name: '', contactPerson: '', phone: '', email: '', address: '', bankName: '', accountTitle: '', accountNumber: '', iban: '', branchCode: '', currentBalance: '' });
+      setForm({ name: '', contactPerson: '', phone: '', email: '', address: '', bankName: '', accountTitle: '', accountNumber: '', iban: '', branchCode: '', openingBalance: '' });
       setShowForm(false);
     } catch {
       setFormError('Failed to create vendor');
@@ -203,7 +203,7 @@ export default function AdminVendorsPage() {
       accountNumber: v.accountNumber ?? '',
       iban: v.iban ?? '',
       branchCode: v.branchCode ?? '',
-      currentBalance: '',
+      openingBalance: '',
     });
     setEditTarget(v);
     setFormError('');
@@ -214,6 +214,7 @@ export default function AdminVendorsPage() {
     if (!editTarget) return;
     setFormError('');
     try {
+      // Opening balance is not editable from this form -- it's shown for reference only.
       await updateVendor({
         id: editTarget.id,
         name: form.name,
@@ -486,8 +487,8 @@ export default function AdminVendorsPage() {
               type="number"
               min="0"
               step="0.01"
-              value={editTarget ? String(editTarget.currentBalance) : form.currentBalance}
-              onChange={(e) => setForm({ ...form, currentBalance: e.target.value })}
+              value={editTarget ? String(editTarget.openingBalance) : form.openingBalance}
+              onChange={(e) => setForm({ ...form, openingBalance: e.target.value })}
               placeholder="e.g. 50000"
               disabled={!!editTarget}
             />

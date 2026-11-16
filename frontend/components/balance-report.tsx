@@ -62,10 +62,10 @@ function SummaryCard({
   );
 }
 
-function StatusCards({ s, unit, currentBalance }: { s: BalanceSubSummary; unit?: string; currentBalance?: number }) {
+function StatusCards({ s, unit }: { s: BalanceSubSummary; unit?: string }) {
   return (
     <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-      <SummaryCard label="Approved" amount={s.approvedAmount + (currentBalance ?? 0)} count={s.approvedCount} color="#1E6E49" bg="#EDF7F2" icon={CheckCircle} unit={unit} />
+      <SummaryCard label="Approved" amount={s.approvedAmount} count={s.approvedCount} color="#1E6E49" bg="#EDF7F2" icon={CheckCircle} unit={unit} />
       <SummaryCard label="Pending"  amount={s.pendingAmount}  count={s.pendingCount}  color="#B87A1A" bg="#FFF8EC" icon={Clock}        unit={unit} />
       <SummaryCard label="Rejected" amount={s.rejectedAmount} count={s.rejectedCount} color="#C0392B" bg="#FDF0EF" icon={XCircle}      unit={unit} />
       <SummaryCard label="Voided"   amount={s.voidedAmount}   count={s.voidedCount}   color="#888"    bg="#f2f2f2" icon={TrendingDown}  unit={unit} />
@@ -238,9 +238,9 @@ export function BalanceReport({ type }: Props) {
     setEditBalanceSaving(true);
     try {
       if (type === 'site') {
-        await updateSite({ id: selectedId, currentBalance: val });
+        await updateSite({ id: selectedId, openingBalance: val });
       } else {
-        await updateVendor({ id: selectedId, currentBalance: val });
+        await updateVendor({ id: selectedId, openingBalance: val });
       }
       setEditBalanceOpen(false);
     } finally {
@@ -294,22 +294,27 @@ export function BalanceReport({ type }: Props) {
               >
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                    Total · {selectedLabel}
+                    Total to date · {selectedLabel}
                   </p>
                   <p className="text-3xl font-bold text-white" style={{ fontFamily: 'var(--font-heading)' }}>
-                    {fmt(balance.totalAmount)}
+                    {fmt(balance.totalToDate)}
                   </p>
                   <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>
                     {balance.invoices.totalCount} invoice{balance.invoices.totalCount !== 1 ? 's' : ''} · {balance.bills.totalCount} bill{balance.bills.totalCount !== 1 ? 's' : ''}
-                    {balance.currentBalance > 0 && ` · ${fmt(balance.currentBalance)} current balance`}
+                    {balance.openingBalance > 0 && ` · ${fmt(balance.openingBalance)} opening balance`}
                   </p>
+                  {type === 'vendor' && (balance.advanceBalance ?? 0) > 0 && (
+                    <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                      {fmt(balance.advanceBalance!)} advance given, not yet applied
+                    </p>
+                  )}
                 </div>
                 <div className="shrink-0 flex flex-col items-end gap-2">
                   <div className="flex gap-2">
                     {type === 'site' && (
                       <button
                         type="button"
-                        onClick={() => { setEditBalanceValue(String(balance.currentBalance)); setEditBalanceOpen(true); }}
+                        onClick={() => { setEditBalanceValue(String(balance.openingBalance)); setEditBalanceOpen(true); }}
                         className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all"
                         style={{
                           background: 'rgba(255,255,255,0.1)',
@@ -377,7 +382,7 @@ export function BalanceReport({ type }: Props) {
               {/* ── Invoices: cards + table ───────────────────────────────── */}
               {activeTab === 'invoices' && (
                 <div className="space-y-4">
-                  <StatusCards s={balance.invoices} unit="invoice" currentBalance={balance.currentBalance} />
+                  <StatusCards s={balance.invoices} unit="invoice" />
                   {invoicesLoading ? (
                     <TableLoading />
                   ) : invoices.length === 0 ? (
@@ -593,17 +598,17 @@ export function BalanceReport({ type }: Props) {
         </div>
       </Modal>
 
-      {/* Edit current balance modal */}
+      {/* Edit opening balance modal */}
       <Modal
         open={editBalanceOpen}
         onClose={() => setEditBalanceOpen(false)}
-        title="Edit Current Balance"
-        subtitle={`Update the opening / existing balance for ${selectedLabel ?? ''}`}
+        title="Edit Opening Balance"
+        subtitle={`Correct the opening balance baseline for ${selectedLabel ?? ''}`}
       >
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
-              Current Balance (PKR)
+              Opening Balance (PKR)
             </label>
             <input
               type="number"
@@ -621,7 +626,9 @@ export function BalanceReport({ type }: Props) {
               autoFocus
             />
             <p className="text-xs mt-1.5" style={{ color: 'var(--text-muted)' }}>
-              This amount is added to the Paid total and Grand Total for this {type}.
+              This replaces the opening balance baseline used in Total to date for this {type}
+              — it is a correction, not a transaction. The live ledger-driven balance is not
+              affected. This change is logged with your name and the time.
             </p>
           </div>
           <div className="flex gap-3 justify-end pt-1">
