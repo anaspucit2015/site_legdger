@@ -13,6 +13,7 @@ export type Vendor = {
   accountNumber: string | null;
   iban: string | null;
   branchCode: string | null;
+  openingBalance: string;
   currentBalance: string;
   advanceBalance: string;
   isActive: boolean;
