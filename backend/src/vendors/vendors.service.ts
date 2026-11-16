@@ -9,7 +9,11 @@ export class VendorsService {
   constructor(private prisma: PrismaService) {}
 
   create(dto: CreateVendorDto) {
-    return this.prisma.vendor.create({ data: dto });
+    // Opening balance is fixed at creation -- whatever starting balance is entered here
+    // becomes the permanent historical baseline for the Lifetime Activity breakdown.
+    return this.prisma.vendor.create({
+      data: { ...dto, openingBalance: dto.currentBalance ?? 0 },
+    });
   }
 
   async findAll(page = 1, limit = 20) {

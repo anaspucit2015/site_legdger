@@ -414,17 +414,19 @@ export class InvoicesService {
       ...(filter.vendorId && { vendorId: filter.vendorId }),
     };
 
-    const [invoices, bills, entity] = await Promise.all([
+    const [invoices, bills, site, vendor] = await Promise.all([
       this.prisma.invoice.findMany({ where, select: { status: true, amount: true } }),
       this.prisma.bill.findMany({ where, select: { status: true, totalAmount: true } }),
       filter.siteId
         ? this.prisma.site.findUnique({ where: { id: filter.siteId }, select: { currentBalance: true } })
-        : filter.vendorId
-          ? this.prisma.vendor.findUnique({ where: { id: filter.vendorId }, select: { currentBalance: true } })
-          : Promise.resolve(null),
+        : Promise.resolve(null),
+      filter.vendorId
+        ? this.prisma.vendor.findUnique({ where: { id: filter.vendorId }, select: { currentBalance: true, openingBalance: true } })
+        : Promise.resolve(null),
     ]);
 
-    const currentBalance = Number(entity?.currentBalance ?? 0);
+    const currentBalance = Number(site?.currentBalance ?? vendor?.currentBalance ?? 0);
+    const openingBalance = vendor ? Number(vendor.openingBalance) : undefined;
 
     function tally(rows: { status: string; amount?: any; totalAmount?: any }[]) {
       const s = {
@@ -448,7 +450,13 @@ export class InvoicesService {
 
     return {
       currentBalance,
-      totalAmount:    inv.totalAmount    + bill.totalAmount    + currentBalance,
+      openingBalance,
+      // Site.currentBalance is a static, manually-set baseline (never auto-updated by
+      // approvals), so adding invoice/bill totals on top of it is correct math for sites.
+      // Vendor.currentBalance IS auto-updated on every approval, so it already includes
+      // those same amounts -- adding them again would double count, so for vendors the
+      // total is just the balance itself.
+      totalAmount: vendor ? currentBalance : inv.totalAmount + bill.totalAmount + currentBalance,
       approvedAmount: inv.approvedAmount + bill.approvedAmount,
       pendingAmount:  inv.pendingAmount  + bill.pendingAmount,
       rejectedAmount: inv.rejectedAmount + bill.rejectedAmount,

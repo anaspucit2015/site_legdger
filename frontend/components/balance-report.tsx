@@ -17,7 +17,7 @@ import {
   SearchableSelect, Table, THead, TBody, Th, Tr, Td, TableEmpty, TableLoading,
   Pagination, PageHeader, Button, Modal, Textarea, Select,
 } from '@/components/ui';
-import { Eye, TrendingDown, CheckCircle, Clock, XCircle, Check, X, Download, FileText, ReceiptText, Pencil } from 'lucide-react';
+import { Eye, TrendingDown, CheckCircle, Clock, XCircle, Check, X, Download, FileText, ReceiptText, Pencil, ChevronDown } from 'lucide-react';
 import { getToken } from '@/lib/auth';
 
 type Props = { type: 'site' | 'vendor' };
@@ -62,10 +62,10 @@ function SummaryCard({
   );
 }
 
-function StatusCards({ s, unit, currentBalance }: { s: BalanceSubSummary; unit?: string; currentBalance?: number }) {
+function StatusCards({ s, unit }: { s: BalanceSubSummary; unit?: string }) {
   return (
     <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-      <SummaryCard label="Approved" amount={s.approvedAmount + (currentBalance ?? 0)} count={s.approvedCount} color="#1E6E49" bg="#EDF7F2" icon={CheckCircle} unit={unit} />
+      <SummaryCard label="Approved" amount={s.approvedAmount} count={s.approvedCount} color="#1E6E49" bg="#EDF7F2" icon={CheckCircle} unit={unit} />
       <SummaryCard label="Pending"  amount={s.pendingAmount}  count={s.pendingCount}  color="#B87A1A" bg="#FFF8EC" icon={Clock}        unit={unit} />
       <SummaryCard label="Rejected" amount={s.rejectedAmount} count={s.rejectedCount} color="#C0392B" bg="#FDF0EF" icon={XCircle}      unit={unit} />
       <SummaryCard label="Voided"   amount={s.voidedAmount}   count={s.voidedCount}   color="#888"    bg="#f2f2f2" icon={TrendingDown}  unit={unit} />
@@ -105,6 +105,7 @@ export function BalanceReport({ type }: Props) {
   const [editBalanceOpen,   setEditBalanceOpen]   = useState(false);
   const [editBalanceValue,  setEditBalanceValue]  = useState('');
   const [editBalanceSaving, setEditBalanceSaving] = useState(false);
+  const [lifetimeOpen,      setLifetimeOpen]      = useState(false);
 
   const { data: sites   = [] } = useGetActiveSitesQuery();
   const { data: vendors = [] } = useGetActiveVendorsQuery();
@@ -294,14 +295,14 @@ export function BalanceReport({ type }: Props) {
               >
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                    Total · {selectedLabel}
+                    {type === 'vendor' ? 'Outstanding Balance' : 'Total'} · {selectedLabel}
                   </p>
                   <p className="text-3xl font-bold text-white" style={{ fontFamily: 'var(--font-heading)' }}>
                     {fmt(balance.totalAmount)}
                   </p>
                   <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>
                     {balance.invoices.totalCount} invoice{balance.invoices.totalCount !== 1 ? 's' : ''} · {balance.bills.totalCount} bill{balance.bills.totalCount !== 1 ? 's' : ''}
-                    {balance.currentBalance > 0 && ` · ${fmt(balance.currentBalance)} current balance`}
+                    {type === 'site' && balance.currentBalance > 0 && ` · ${fmt(balance.currentBalance)} opening balance`}
                   </p>
                 </div>
                 <div className="shrink-0 flex flex-col items-end gap-2">
@@ -348,6 +349,72 @@ export function BalanceReport({ type }: Props) {
                 </div>
               </div>
 
+              {/* ── Lifetime Activity (vendor only) ─────────────────────────
+                  Informational breakdown, kept separate from Outstanding Balance above
+                  on purpose -- this is a gross, all-time figure (approved invoices/bills
+                  since this vendor's opening balance), it does not subtract payments or
+                  advances, so it will not match Outstanding Balance once any payment has
+                  been made. That's intentional, not a bug: Outstanding is "what we owe
+                  right now"; this is "total business done with this vendor." */}
+              {type === 'vendor' && balance.openingBalance !== undefined && (
+                <div className="card p-5">
+                  <button
+                    type="button"
+                    onClick={() => setLifetimeOpen((o) => !o)}
+                    className="w-full flex items-center justify-between"
+                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 0 }}
+                  >
+                    <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
+                      Lifetime Activity
+                    </p>
+                    <ChevronDown
+                      size={16}
+                      style={{
+                        color: 'var(--text-muted)',
+                        transition: 'transform 0.25s ease',
+                        transform: lifetimeOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                      }}
+                    />
+                  </button>
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateRows: lifetimeOpen ? '1fr' : '0fr',
+                      transition: 'grid-template-rows 0.25s ease',
+                    }}
+                  >
+                    <div style={{ overflow: 'hidden' }}>
+                      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 mt-4">
+                        <div>
+                          <p className="text-xs mb-0.5" style={{ color: 'var(--text-muted)' }}>Opening Balance</p>
+                          <p className="text-lg font-bold" style={{ color: 'var(--navy)', fontFamily: 'var(--font-heading)' }}>
+                            {fmt(balance.openingBalance)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs mb-0.5" style={{ color: 'var(--text-muted)' }}>Total Invoices (Approved)</p>
+                          <p className="text-lg font-bold" style={{ color: 'var(--navy)', fontFamily: 'var(--font-heading)' }}>
+                            {fmt(balance.invoices.approvedAmount)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs mb-0.5" style={{ color: 'var(--text-muted)' }}>Total Bills (Approved)</p>
+                          <p className="text-lg font-bold" style={{ color: 'var(--navy)', fontFamily: 'var(--font-heading)' }}>
+                            {fmt(balance.bills.approvedAmount)}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="mt-4 pt-4 flex items-center justify-between" style={{ borderTop: '1px solid var(--border)' }}>
+                        <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Grand Total</p>
+                        <p className="text-xl font-bold" style={{ color: 'var(--navy)', fontFamily: 'var(--font-heading)' }}>
+                          {fmt(balance.openingBalance + balance.invoices.approvedAmount + balance.bills.approvedAmount)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* ── Tab switcher ──────────────────────────────────────────── */}
               <div className="flex gap-1 p-1 rounded-xl w-fit" style={{ background: 'var(--border)' }}>
                 {([
@@ -377,7 +444,7 @@ export function BalanceReport({ type }: Props) {
               {/* ── Invoices: cards + table ───────────────────────────────── */}
               {activeTab === 'invoices' && (
                 <div className="space-y-4">
-                  <StatusCards s={balance.invoices} unit="invoice" currentBalance={balance.currentBalance} />
+                  <StatusCards s={balance.invoices} unit="invoice" />
                   {invoicesLoading ? (
                     <TableLoading />
                   ) : invoices.length === 0 ? (
