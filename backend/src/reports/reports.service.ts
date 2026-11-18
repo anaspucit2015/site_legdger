@@ -27,6 +27,7 @@ type AllBalancesRow = {
   accountNumber?: string;
   iban?: string;
   openingBalance: number;
+  rangeOpeningBalance?: number; // vendor only -- balance just before rangeStart
   totalAmount: number;
   approvedAmount: number;
   pendingAmount: number;
@@ -41,7 +42,10 @@ function buildAllBalancesWorkbook(
   labelHeader: string,
   extraHeader: string,
   rows: AllBalancesRow[],
+  rangeStart?: Date,
+  rangeEnd?: Date,
 ): Promise<ExcelJS.Buffer> {
+  const hasRangeOpening = sheetTitle === 'Vendors' && !!rangeStart;
   const workbook   = new ExcelJS.Workbook();
   workbook.creator = 'SiteLedger';
   workbook.created = new Date();
@@ -61,23 +65,57 @@ function buildAllBalancesWorkbook(
       { header: 'IBAN',                                              key: 'iban',           width: 24 },
     ] : []),
     { header: 'Opening Balance (PKR)',                              key: 'openingBalance', width: 18 },
+    ...(hasRangeOpening ? [
+      { header: `Balance at Start (PKR) [${rangeStart!.toLocaleDateString('en-PK')}]`, key: 'rangeOpeningBalance', width: 20 },
+    ] : []),
     { header: 'Approved (PKR)',                                     key: 'approvedAmount', width: 16 },
     { header: 'Pending (PKR)',                                      key: 'pendingAmount',  width: 16 },
     { header: 'Rejected (PKR)',                                     key: 'rejectedAmount', width: 16 },
     { header: 'Voided (PKR)',                                       key: 'voidedAmount',   width: 16 },
-    { header: sheetTitle === 'Vendors' ? 'Outstanding Balance (PKR)' : 'Grand Total (PKR)', key: 'totalAmount', width: 20 },
+    {
+      header: sheetTitle === 'Vendors'
+        ? `${rangeStart ? 'Closing' : 'Outstanding'} Balance (PKR)${rangeEnd ? ` [as of ${rangeEnd.toLocaleDateString('en-PK')}]` : ''}`
+        : 'Grand Total (PKR)',
+      key: 'totalAmount', width: 20,
+    },
     { header: 'Invoices',                                           key: 'invoiceCount',   width: 10 },
     { header: 'Bills',                                              key: 'billCount',      width: 10 },
   ];
-  sheet.getRow(1).eachCell((cell) => {
+  const periodText =
+    rangeStart && rangeEnd ? `${rangeStart.toLocaleDateString('en-PK')} – ${rangeEnd.toLocaleDateString('en-PK')}`
+    : rangeEnd             ? `Up to ${rangeEnd.toLocaleDateString('en-PK')}`
+    : rangeStart            ? `From ${rangeStart.toLocaleDateString('en-PK')} to today`
+    : 'Full History (live balance)';
+
+  const columnCount = sheet.columns.length;
+  const generatedRow = sheet.insertRow(1, [`Generated ${new Date().toLocaleString('en-PK', { dateStyle: 'medium', timeStyle: 'short' })}`]);
+  sheet.mergeCells(1, 1, 1, columnCount);
+  generatedRow.getCell(1).font = { italic: true, size: 9, color: { argb: 'FF888888' } };
+  generatedRow.getCell(1).alignment = { horizontal: 'left', vertical: 'middle' };
+  generatedRow.height = 16;
+
+  const periodRow = sheet.insertRow(2, [`Report Period: ${periodText}`]);
+  sheet.mergeCells(2, 1, 2, columnCount);
+  periodRow.getCell(1).font = { bold: true, size: 10, color: { argb: 'FF1B2A4A' } };
+  periodRow.getCell(1).alignment = { horizontal: 'left', vertical: 'middle' };
+  periodRow.height = 18;
+
+  const headerRow = sheet.getRow(3);
+  headerRow.eachCell((cell) => {
     cell.fill = navyFill; cell.font = navyFont;
     cell.alignment = { vertical: 'middle', horizontal: 'center' };
     cell.border = { bottom: { style: 'thin', color: { argb: 'FFE8A33D' } } };
   });
-  sheet.getRow(1).height = 22;
+  headerRow.height = 22;
 
-  const moneyCols = ['openingBalance', 'approvedAmount', 'pendingAmount', 'rejectedAmount', 'voidedAmount', 'totalAmount'];
-  const totals = { openingBalance: 0, approvedAmount: 0, pendingAmount: 0, rejectedAmount: 0, voidedAmount: 0, totalAmount: 0, invoiceCount: 0, billCount: 0 };
+  const moneyCols = [
+    'openingBalance', ...(hasRangeOpening ? ['rangeOpeningBalance'] : []),
+    'approvedAmount', 'pendingAmount', 'rejectedAmount', 'voidedAmount', 'totalAmount',
+  ];
+  const totals = {
+    openingBalance: 0, rangeOpeningBalance: 0,
+    approvedAmount: 0, pendingAmount: 0, rejectedAmount: 0, voidedAmount: 0, totalAmount: 0, invoiceCount: 0, billCount: 0,
+  };
 
   rows.forEach((r, idx) => {
     const row = sheet.addRow(r);
@@ -93,6 +131,7 @@ function buildAllBalancesWorkbook(
     row.getCell('billCount').alignment    = { horizontal: 'center', vertical: 'middle' };
 
     totals.openingBalance += r.openingBalance;
+    totals.rangeOpeningBalance += r.rangeOpeningBalance ?? 0;
     totals.approvedAmount += r.approvedAmount;
     totals.pendingAmount  += r.pendingAmount;
     totals.rejectedAmount += r.rejectedAmount;
@@ -112,7 +151,7 @@ function buildAllBalancesWorkbook(
   totalRow.getCell('invoiceCount').alignment = { horizontal: 'center', vertical: 'middle' };
   totalRow.getCell('billCount').alignment    = { horizontal: 'center', vertical: 'middle' };
 
-  sheet.views = [{ state: 'frozen', ySplit: 1 }];
+  sheet.views = [{ state: 'frozen', ySplit: 3 }];
 
   return workbook.xlsx.writeBuffer();
 }
@@ -120,6 +159,20 @@ function buildAllBalancesWorkbook(
 @Injectable()
 export class ReportsService {
   constructor(private prisma: PrismaService) {}
+
+  // Reconstructs a vendor's outstanding balance as of a past date from the
+  // VendorTransaction ledger (every balance-affecting event snapshots
+  // outstandingAfter), falling back to openingBalance if nothing happened yet.
+  private async getVendorOutstandingAsOf(vendorId: string, asOf: Date): Promise<number> {
+    const txn = await this.prisma.vendorTransaction.findFirst({
+      where: { vendorId, createdAt: { lte: asOf } },
+      orderBy: { createdAt: 'desc' },
+      select: { outstandingAfter: true },
+    });
+    if (txn) return Number(txn.outstandingAfter);
+    const vendor = await this.prisma.vendor.findUnique({ where: { id: vendorId }, select: { openingBalance: true } });
+    return Number(vendor?.openingBalance ?? 0);
+  }
 
   async getVendors() {
     return this.prisma.vendor.findMany({
@@ -476,10 +529,24 @@ export class ReportsService {
   async generateBalanceReport(filter: {
     siteId?: string;
     vendorId?: string;
+    dateFrom?: string;
+    dateTo?: string;
   }): Promise<ExcelJS.Buffer> {
+    const rangeStart = filter.dateFrom ? new Date(new Date(filter.dateFrom).setHours(0, 0, 0, 0))     : undefined;
+    const rangeEnd   = filter.dateTo   ? new Date(new Date(filter.dateTo).setHours(23, 59, 59, 999))  : undefined;
+    // "Just before the range starts" -- the instant used to reconstruct the vendor's
+    // balance at the start of the window, so the start day's own activity is excluded.
+    const justBeforeRangeStart = rangeStart ? new Date(rangeStart.getTime() - 1) : undefined;
+
     const where = {
       ...(filter.siteId   && { siteId:   filter.siteId }),
       ...(filter.vendorId && { vendorId: filter.vendorId }),
+      ...((rangeStart || rangeEnd) && {
+        submittedAt: {
+          ...(rangeStart && { gte: rangeStart }),
+          ...(rangeEnd   && { lte: rangeEnd }),
+        },
+      }),
     };
 
     const [invoices, bills] = await Promise.all([
@@ -498,7 +565,8 @@ export class ReportsService {
     // balance -- Vendor has a real, separate openingBalance field set once at creation.
     let entityName = 'Unknown';
     let openingBalance = 0;
-    let outstandingBalance: number | null = null; // vendor only
+    let outstandingBalance: number | null = null; // vendor only -- closing balance (as of rangeEnd, or live)
+    let rangeOpeningBalance: number | null = null; // vendor only -- balance just before rangeStart, when a range is set
     let vendorBankDetails: { bankName: string | null; accountNumber: string | null; iban: string | null } | null = null;
     if (filter.siteId) {
       const site = await this.prisma.site.findUnique({ where: { id: filter.siteId }, select: { name: true, currentBalance: true } });
@@ -511,7 +579,12 @@ export class ReportsService {
       });
       entityName = vendor?.name ?? filter.vendorId;
       openingBalance = Number(vendor?.openingBalance ?? 0);
-      outstandingBalance = Number(vendor?.currentBalance ?? 0);
+      outstandingBalance = rangeEnd
+        ? await this.getVendorOutstandingAsOf(filter.vendorId, rangeEnd)
+        : Number(vendor?.currentBalance ?? 0);
+      rangeOpeningBalance = justBeforeRangeStart
+        ? await this.getVendorOutstandingAsOf(filter.vendorId, justBeforeRangeStart)
+        : null;
       vendorBankDetails = vendor ? { bankName: vendor.bankName, accountNumber: vendor.accountNumber, iban: vendor.iban } : null;
     }
 
@@ -557,6 +630,19 @@ export class ReportsService {
     // so adding invoice/bill totals on top of it is correct math for sites.
     const headlineLabel = filter.vendorId ? 'Outstanding Balance' : 'Grand Total';
     const headlineAmount = filter.vendorId ? outstandingBalance! : (inv.total + bill.total + openingBalance);
+    const netMovement = rangeOpeningBalance !== null ? outstandingBalance! - rangeOpeningBalance : null;
+
+    const rangeLabel =
+      rangeStart && rangeEnd ? ` (${rangeStart.toLocaleDateString('en-PK')} – ${rangeEnd.toLocaleDateString('en-PK')})`
+      : rangeEnd             ? ` (as of ${rangeEnd.toLocaleDateString('en-PK')})`
+      : rangeStart            ? ` (from ${rangeStart.toLocaleDateString('en-PK')})`
+      : '';
+
+    const periodText =
+      rangeStart && rangeEnd ? `${rangeStart.toLocaleDateString('en-PK')} – ${rangeEnd.toLocaleDateString('en-PK')}`
+      : rangeEnd             ? `Up to ${rangeEnd.toLocaleDateString('en-PK')}`
+      : rangeStart            ? `From ${rangeStart.toLocaleDateString('en-PK')} to today`
+      : 'Full History (live balance)';
 
     const workbook   = new ExcelJS.Workbook();
     workbook.creator = 'SiteLedger';
@@ -609,7 +695,7 @@ export class ReportsService {
       { key: 'a', width: 20 }, { key: 'b', width: 18 }, { key: 'c', width: 12 },
     ];
 
-    const titleRow = sum_sheet.addRow([`Balance Report — ${entityName}`, '', '']);
+    const titleRow = sum_sheet.addRow([`Balance Report — ${entityName}${rangeLabel}`, '', '']);
     titleRow.getCell(1).fill = navyFill;
     titleRow.getCell(1).font = { ...navyFont, size: 13 };
     titleRow.getCell(2).fill = navyFill;
@@ -617,6 +703,19 @@ export class ReportsService {
     titleRow.height = 26;
     sum_sheet.mergeCells('A1:C1');
     titleRow.getCell(1).alignment = { horizontal: 'left', vertical: 'middle' };
+
+    const generatedRow = sum_sheet.addRow([`Generated ${new Date().toLocaleString('en-PK', { dateStyle: 'medium', timeStyle: 'short' })}`, '', '']);
+    sum_sheet.mergeCells(generatedRow.number, 1, generatedRow.number, 3);
+    generatedRow.getCell(1).font = { italic: true, size: 9, color: { argb: 'FF888888' } };
+    generatedRow.getCell(1).alignment = { horizontal: 'left', vertical: 'middle' };
+    generatedRow.height = 16;
+
+    const periodRow = sum_sheet.addRow([`Report Period: ${periodText}`, '', '']);
+    sum_sheet.mergeCells(periodRow.number, 1, periodRow.number, 3);
+    periodRow.getCell(1).font = { bold: true, size: 10, color: { argb: 'FF1B2A4A' } };
+    periodRow.getCell(1).alignment = { horizontal: 'left', vertical: 'middle' };
+    periodRow.height = 18;
+
     sum_sheet.addRow([]);
 
     // Vendor bank details
@@ -634,13 +733,24 @@ export class ReportsService {
       sum_sheet.addRow([]);
     }
 
-    // Opening balance
+    // Opening balance (lifetime, fixed at vendor creation -- or site's manual baseline)
     const openingRow = sum_sheet.addRow([`Opening Balance`, openingBalance, '']);
     openingRow.eachCell({ includeEmpty: true }, (c) => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8F4F8' } }; c.alignment = { vertical: 'middle' }; });
     openingRow.getCell(1).font = boldFont;
     openingRow.getCell(2).numFmt = '#,##0';
     openingRow.getCell(2).alignment = { horizontal: 'right', vertical: 'middle' };
     openingRow.height = 19;
+
+    // Balance at start of range -- only shown when a "from" date narrows the window,
+    // reconstructed from the VendorTransaction ledger just before that date.
+    if (rangeOpeningBalance !== null && rangeStart) {
+      const rangeOpenRow = sum_sheet.addRow([`Balance at Start (${rangeStart.toLocaleDateString('en-PK')})`, rangeOpeningBalance, '']);
+      rangeOpenRow.eachCell({ includeEmpty: true }, (c) => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8F9FA' } }; c.alignment = { vertical: 'middle' }; });
+      rangeOpenRow.getCell(1).font = boldFont;
+      rangeOpenRow.getCell(2).numFmt = '#,##0';
+      rangeOpenRow.getCell(2).alignment = { horizontal: 'right', vertical: 'middle' };
+      rangeOpenRow.height = 19;
+    }
 
     // Invoices + bills movement total
     const movementRow = sum_sheet.addRow([`Invoices + Bills`, combined.total, combined.totalCount]);
@@ -659,6 +769,18 @@ export class ReportsService {
     grandRow.getCell(2).alignment = { horizontal: 'right', vertical: 'middle' };
     grandRow.getCell(3).alignment = { horizontal: 'center', vertical: 'middle' };
     grandRow.height = 22;
+
+    if (netMovement !== null) {
+      const netRow = sum_sheet.addRow([`Net Movement`, netMovement, '']);
+      netRow.eachCell({ includeEmpty: true }, (c) => {
+        c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: netMovement >= 0 ? 'FFFDE8E8' : 'FFD4EDDA' } };
+        c.alignment = { vertical: 'middle' };
+      });
+      netRow.getCell(1).font = boldFont;
+      netRow.getCell(2).numFmt = '#,##0;[Red]-#,##0';
+      netRow.getCell(2).alignment = { horizontal: 'right', vertical: 'middle' };
+      netRow.height = 19;
+    }
     sum_sheet.addRow([]);
 
     addSummaryBlock(sum_sheet, 'Invoices', inv);
@@ -807,7 +929,11 @@ export class ReportsService {
     return buildAllBalancesWorkbook('Sites', 'Site Code', 'Location', rows);
   }
 
-  async generateAllVendorsBalanceReport(): Promise<ExcelJS.Buffer> {
+  async generateAllVendorsBalanceReport(dateFrom?: string, dateTo?: string): Promise<ExcelJS.Buffer> {
+    const rangeStart = dateFrom ? new Date(new Date(dateFrom).setHours(0, 0, 0, 0))    : undefined;
+    const rangeEnd   = dateTo   ? new Date(new Date(dateTo).setHours(23, 59, 59, 999)) : undefined;
+    const justBeforeRangeStart = rangeStart ? new Date(rangeStart.getTime() - 1) : undefined;
+
     const vendors = await this.prisma.vendor.findMany({
       where: { isActive: true, isArchived: false },
       select: {
@@ -822,17 +948,27 @@ export class ReportsService {
     }
 
     const vendorIds = vendors.map((v) => v.id);
-    const [invoices, bills] = await Promise.all([
-      this.prisma.invoice.findMany({ where: { vendorId: { in: vendorIds } }, select: { vendorId: true, status: true, amount: true } }),
-      this.prisma.bill.findMany({    where: { vendorId: { in: vendorIds } }, select: { vendorId: true, status: true, totalAmount: true } }),
+    const dateWhere = (rangeStart || rangeEnd) ? {
+      submittedAt: { ...(rangeStart && { gte: rangeStart }), ...(rangeEnd && { lte: rangeEnd }) },
+    } : {};
+    const [invoices, bills, closingByVendor, rangeOpeningByVendor] = await Promise.all([
+      this.prisma.invoice.findMany({ where: { vendorId: { in: vendorIds }, ...dateWhere }, select: { vendorId: true, status: true, amount: true } }),
+      this.prisma.bill.findMany({    where: { vendorId: { in: vendorIds }, ...dateWhere }, select: { vendorId: true, status: true, totalAmount: true } }),
+      rangeEnd
+        ? Promise.all(vendors.map((v) => this.getVendorOutstandingAsOf(v.id, rangeEnd)))
+        : Promise.resolve(null),
+      justBeforeRangeStart
+        ? Promise.all(vendors.map((v) => this.getVendorOutstandingAsOf(v.id, justBeforeRangeStart)))
+        : Promise.resolve(null),
     ]);
 
-    const rows = vendors.map((vendor) => {
+    const rows = vendors.map((vendor, idx) => {
       const inv  = tallyByStatus(invoices.filter((i) => i.vendorId === vendor.id));
       const bill = tallyByStatus(bills.filter((b) => b.vendorId === vendor.id));
       // Vendor.currentBalance already reflects every approved invoice/bill -- it IS the
       // outstanding balance, nothing to add on top. openingBalance is the real, separate,
-      // fixed-at-creation field.
+      // fixed-at-creation field. When a range is given, the closing/start-of-range balances
+      // are reconstructed from the VendorTransaction ledger instead of reading the live (now) balance.
       return {
         label:          vendor.contactPerson ?? '—',
         name:           vendor.name,
@@ -841,7 +977,8 @@ export class ReportsService {
         accountNumber:  vendor.accountNumber ?? '—',
         iban:           vendor.iban ?? '—',
         openingBalance: Number(vendor.openingBalance),
-        totalAmount:    Number(vendor.currentBalance),
+        ...(rangeOpeningByVendor && { rangeOpeningBalance: rangeOpeningByVendor[idx] }),
+        totalAmount:    closingByVendor ? closingByVendor[idx] : Number(vendor.currentBalance),
         approvedAmount: inv.approvedAmount + bill.approvedAmount,
         pendingAmount:  inv.pendingAmount  + bill.pendingAmount,
         rejectedAmount: inv.rejectedAmount + bill.rejectedAmount,
@@ -851,7 +988,7 @@ export class ReportsService {
       };
     });
 
-    return buildAllBalancesWorkbook('Vendors', 'Contact Person', 'Phone', rows);
+    return buildAllBalancesWorkbook('Vendors', 'Contact Person', 'Phone', rows, rangeStart, rangeEnd);
   }
 
   async generateInvoiceReport(filters: {
