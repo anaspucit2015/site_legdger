@@ -13,11 +13,13 @@ export type Site = {
 
 export const sitesApi = baseApi.injectEndpoints({
   endpoints: (build) => ({
-    getSites: build.query<PaginatedResult<Site>, { page?: number; limit?: number } | void>({
+    getSites: build.query<PaginatedResult<Site>, { page?: number; limit?: number; search?: string; status?: string } | void>({
       query: (params) => {
         const qs = new URLSearchParams();
         if (params?.page) qs.set('page', String(params.page));
         if (params?.limit) qs.set('limit', String(params.limit));
+        if (params?.search) qs.set('search', params.search);
+        if (params?.status) qs.set('status', params.status);
         const str = qs.toString();
         return str ? `/sites?${str}` : '/sites';
       },

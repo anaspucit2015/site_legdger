@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTaskDto, UpdateTaskDto } from './tasks.dto';
 
@@ -19,16 +20,19 @@ export class TasksService {
     });
   }
 
-  async findAll(page = 1, limit = 20) {
+  async findAll(page = 1, limit = 20, status?: string) {
     const skip = (page - 1) * limit;
+    const where: Prisma.TaskWhereInput | undefined =
+      status === 'active' ? { isActive: true } : status === 'inactive' ? { isActive: false } : undefined;
     const [data, total] = await Promise.all([
       this.prisma.task.findMany({
+        where,
         include: { rateHistory: { orderBy: { changedAt: 'desc' } } },
         orderBy: { createdAt: 'desc' },
         skip,
         take: limit,
       }),
-      this.prisma.task.count(),
+      this.prisma.task.count({ where }),
     ]);
     return { data, total, page, limit };
   }

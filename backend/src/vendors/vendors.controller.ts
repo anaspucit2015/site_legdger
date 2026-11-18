@@ -18,8 +18,13 @@ export class VendorsController {
   }
 
   @Get()
-  findAll(@Query('page') page?: string, @Query('limit') limit?: string) {
-    return this.vendorsService.findAll(Number(page) || 1, Number(limit) || 20);
+  findAll(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+    @Query('status') status?: string,
+  ) {
+    return this.vendorsService.findAll(Number(page) || 1, Number(limit) || 20, search, status);
   }
 
   // Must come before /:id routes

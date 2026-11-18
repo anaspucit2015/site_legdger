@@ -1,4 +1,5 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateUserDto, UpdateUserDto } from './users.dto';
 import * as bcrypt from 'bcrypt';
@@ -23,16 +24,23 @@ export class UsersService {
     });
   }
 
-  async findAll(page = 1, limit = 20) {
+  async findAll(page = 1, limit = 20, status?: string, search?: string) {
     const skip = (page - 1) * limit;
+    const where: Prisma.UserWhereInput = {};
+    if (search) where.OR = [{ name: { contains: search, mode: 'insensitive' } }, { email: { contains: search, mode: 'insensitive' } }];
+    if (status === 'archived') where.isArchived = true;
+    else if (status === 'active') { where.isActive = true; where.isArchived = false; }
+    else if (status === 'inactive') { where.isActive = false; where.isArchived = false; }
+    else where.isArchived = false; // 'all' (default) hides archived
     const [data, total] = await Promise.all([
       this.prisma.user.findMany({
         select: SELECT,
+        where,
         orderBy: { createdAt: 'desc' },
         skip,
         take: limit,
       }),
-      this.prisma.user.count(),
+      this.prisma.user.count({ where }),
     ]);
     return { data, total, page, limit };
   }

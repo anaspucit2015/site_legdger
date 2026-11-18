@@ -1,13 +1,14 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useGetSitesQuery, useCreateSiteMutation, useUpdateSiteMutation, useDeactivateSiteMutation, useArchiveSiteMutation, Site } from '@/lib/api/sitesApi';
 import {
   Button, Input, Modal,
   Table, THead, TBody, Th, Tr, Td, TableLoading,
   PageHeader, Pagination,
 } from '@/components/ui';
-import { Plus } from 'lucide-react';
+import { Plus, Search } from 'lucide-react';
 import { toast } from 'sonner';
+import { useDebounce } from '@/lib/hooks/useDebounce';
 
 type Filter = 'all' | 'active' | 'inactive' | 'archived';
 
@@ -19,24 +20,22 @@ function statusBadge(s: Site) {
 
 export default function AdminSitesPage() {
   const [page, setPage] = useState(1);
-  const { data: result, isLoading } = useGetSitesQuery({ page });
-  const allSites = result?.data ?? [];
-  const total    = result?.total ?? 0;
+  const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 400);
+  const [filter, setFilter] = useState<Filter>('all');
+  const { data: result, isLoading } = useGetSitesQuery({ page, search: debouncedSearch || undefined, status: filter });
+  const sites = result?.data ?? [];
+  const total = result?.total ?? 0;
+
+  useEffect(() => { setPage(1); }, [debouncedSearch, filter]);
 
   const [createSite, { isLoading: creating }] = useCreateSiteMutation();
   const [updateSite] = useUpdateSiteMutation();
-  const [deactivate] = useDeactivateSiteMutation();
+  const [deactivate, { isLoading: deactivating }] = useDeactivateSiteMutation();
   const [archiveSite, { isLoading: archiving }] = useArchiveSiteMutation();
 
-  const [filter, setFilter] = useState<Filter>('all');
   const [archiveTarget, setArchiveTarget] = useState<Site | null>(null);
-
-  const sites = allSites.filter((s) => {
-    if (filter === 'archived') return s.isArchived;
-    if (filter === 'active')   return s.isActive && !s.isArchived;
-    if (filter === 'inactive') return !s.isActive && !s.isArchived;
-    return !s.isArchived; // 'all' hides archived
-  });
+  const [deactivateTarget, setDeactivateTarget] = useState<Site | null>(null);
 
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ name: '', location: '', currentBalance: '' });
@@ -58,12 +57,15 @@ export default function AdminSitesPage() {
     }
   }
 
-  async function handleDeactivate(id: string) {
+  async function handleDeactivateConfirm() {
+    if (!deactivateTarget) return;
     try {
-      await deactivate(id).unwrap();
+      await deactivate(deactivateTarget.id).unwrap();
       toast.success('Site deactivated successfully.');
+      setDeactivateTarget(null);
     } catch (err: any) {
       toast.error(err?.data?.message ?? 'Failed to deactivate site.');
+      setDeactivateTarget(null);
     }
   }
 
@@ -95,6 +97,15 @@ export default function AdminSitesPage() {
         subtitle="Manage construction sites"
         action={
           <div className="flex gap-2">
+            <div className="relative" style={{ width: 220 }}>
+              <Search size={15} className="absolute top-1/2 -translate-y-1/2 left-3" style={{ color: 'var(--text-muted)' }} />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search sites…"
+                className="pl-9"
+              />
+            </div>
             <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'var(--border)' }}>
               {(['all', 'active', 'inactive', 'archived'] as Filter[]).map((f) => {
                 const active = filter === f;
@@ -159,7 +170,7 @@ export default function AdminSitesPage() {
                         </Button>
                       )}
                       {s.isActive && !s.isArchived && (
-                        <Button size="sm" variant="ghost" onClick={() => handleDeactivate(s.id)} style={{ color: 'var(--text-muted)' }}>
+                        <Button size="sm" variant="ghost" onClick={() => setDeactivateTarget(s)} style={{ color: 'var(--text-muted)' }}>
                           Deactivate
                         </Button>
                       )}
@@ -208,6 +219,29 @@ export default function AdminSitesPage() {
             <Button type="submit" loading={creating}>{creating ? 'Creating…' : 'Create Site'}</Button>
           </div>
         </form>
+      </Modal>
+
+      {/* Deactivate Confirmation Modal */}
+      <Modal open={!!deactivateTarget} onClose={() => setDeactivateTarget(null)} title="Deactivate Site">
+        <div className="space-y-4">
+          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+            Are you sure you want to deactivate{' '}
+            <span className="font-semibold" style={{ color: 'var(--navy)' }}>{deactivateTarget?.name}</span>?
+          </p>
+          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+            Deactivated sites are hidden from the site dropdown and cannot be selected for new invoices or bills. Their historical data is preserved and they can be reactivated at any time.
+          </p>
+          <div className="flex gap-3 justify-end pt-1">
+            <Button variant="outline" onClick={() => setDeactivateTarget(null)}>Cancel</Button>
+            <Button
+              loading={deactivating}
+              onClick={handleDeactivateConfirm}
+              style={{ background: 'var(--rust)', color: 'white' }}
+            >
+              {deactivating ? 'Deactivating…' : 'Deactivate Site'}
+            </Button>
+          </div>
+        </div>
       </Modal>
 
       {/* Archive Confirmation Modal */}

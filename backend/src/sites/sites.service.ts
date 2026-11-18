@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateSiteDto, UpdateSiteDto } from './sites.dto';
 
@@ -10,11 +11,17 @@ export class SitesService {
     return this.prisma.site.create({ data: dto });
   }
 
-  async findAll(page = 1, limit = 20) {
+  async findAll(page = 1, limit = 20, search?: string, status?: string) {
     const skip = (page - 1) * limit;
+    const where: Prisma.SiteWhereInput = {};
+    if (search) where.OR = [{ name: { contains: search, mode: 'insensitive' } }, { location: { contains: search, mode: 'insensitive' } }];
+    if (status === 'archived') where.isArchived = true;
+    else if (status === 'active') { where.isActive = true; where.isArchived = false; }
+    else if (status === 'inactive') { where.isActive = false; where.isArchived = false; }
+    else where.isArchived = false; // 'all' (default) hides archived
     const [data, total] = await Promise.all([
-      this.prisma.site.findMany({ orderBy: { siteCode: 'asc' }, skip, take: limit }),
-      this.prisma.site.count(),
+      this.prisma.site.findMany({ where, orderBy: { siteCode: 'asc' }, skip, take: limit }),
+      this.prisma.site.count({ where }),
     ]);
     return { data, total, page, limit };
   }

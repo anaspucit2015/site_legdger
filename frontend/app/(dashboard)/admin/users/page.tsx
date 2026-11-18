@@ -10,7 +10,9 @@ import {
   Table, THead, TBody, Th, Tr, Td, TableLoading,
   PageHeader, Pagination,
 } from '@/components/ui';
-import { Plus } from 'lucide-react';
+import { Plus, Search } from 'lucide-react';
+import { useDebounce } from '@/lib/hooks/useDebounce';
+import { toast } from 'sonner';
 
 type Filter = 'all' | 'active' | 'inactive' | 'archived';
 
@@ -34,30 +36,28 @@ function statusBadge(u: User) {
 
 export default function AdminUsersPage() {
   const [page, setPage] = useState(1);
-  const { data: result, isLoading } = useGetUsersQuery({ page });
+  const [filter, setFilter] = useState<Filter>('all');
+  const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 400);
+  const { data: result, isLoading } = useGetUsersQuery({ page, status: filter, search: debouncedSearch || undefined });
   const users = result?.data ?? [];
   const total = result?.total ?? 0;
 
   const [createUser, { isLoading: creating }] = useCreateUserMutation();
   const [updateUser] = useUpdateUserMutation();
-  const [deactivate] = useDeactivateUserMutation();
+  const [deactivate, { isLoading: deactivating }] = useDeactivateUserMutation();
   const [archiveUser, { isLoading: archiving }] = useArchiveUserMutation();
 
   const [showForm, setShowForm] = useState(false);
   const [archiveTarget, setArchiveTarget] = useState<User | null>(null);
-  const [filter, setFilter] = useState<Filter>('all');
+  const [deactivateTarget, setDeactivateTarget] = useState<User | null>(null);
   const [currentRole, setCurrentRole] = useState<string | null>(null);
 
   useEffect(() => {
     setCurrentRole(getUser()?.role ?? null);
   }, []);
 
-  const filtered = users.filter((u) => {
-    if (filter === 'archived') return u.isArchived;
-    if (filter === 'active')   return u.isActive && !u.isArchived;
-    if (filter === 'inactive') return !u.isActive && !u.isArchived;
-    return !u.isArchived; // 'all' hides archived
-  });
+  useEffect(() => { setPage(1); }, [filter, debouncedSearch]);
 
   const [form, setForm] = useState({ name: '', email: '', password: '', role: 'site_supervisor' });
   const [error, setError] = useState('');
@@ -80,6 +80,18 @@ export default function AdminUsersPage() {
     setArchiveTarget(null);
   }
 
+  async function handleDeactivateConfirm() {
+    if (!deactivateTarget) return;
+    try {
+      await deactivate(deactivateTarget.id).unwrap();
+      toast.success('User deactivated successfully.');
+      setDeactivateTarget(null);
+    } catch (err: any) {
+      toast.error(err?.data?.message ?? 'Failed to deactivate user.');
+      setDeactivateTarget(null);
+    }
+  }
+
   const isAdmin = currentRole === 'admin';
 
   return (
@@ -89,6 +101,15 @@ export default function AdminUsersPage() {
         subtitle="Manage system users and roles"
         action={
           <div className="flex gap-2">
+            <div className="relative" style={{ width: 220 }}>
+              <Search size={15} className="absolute top-1/2 -translate-y-1/2 left-3" style={{ color: 'var(--text-muted)' }} />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search users…"
+                className="pl-9"
+              />
+            </div>
             <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'var(--border)' }}>
               {(['all', 'active', 'inactive', 'archived'] as Filter[]).map((f) => {
                 const active = filter === f;
@@ -130,7 +151,7 @@ export default function AdminUsersPage() {
             </tr>
           </THead>
           <TBody>
-            {filtered.map((u) => {
+            {users.map((u) => {
               const badge = statusBadge(u);
               return (
                 <Tr key={u.id}>
@@ -161,7 +182,7 @@ export default function AdminUsersPage() {
                           </Button>
                         )}
                         {u.isActive && !u.isArchived && (
-                          <Button size="sm" variant="ghost" onClick={() => deactivate(u.id)} style={{ color: 'var(--text-muted)' }}>
+                          <Button size="sm" variant="ghost" onClick={() => setDeactivateTarget(u)} style={{ color: 'var(--text-muted)' }}>
                             Deactivate
                           </Button>
                         )}
@@ -217,6 +238,29 @@ export default function AdminUsersPage() {
             <Button type="submit" loading={creating}>{creating ? 'Creating…' : 'Create User'}</Button>
           </div>
         </form>
+      </Modal>
+
+      {/* Deactivate Confirmation Modal */}
+      <Modal open={!!deactivateTarget} onClose={() => setDeactivateTarget(null)} title="Deactivate User">
+        <div className="space-y-4">
+          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+            Are you sure you want to deactivate{' '}
+            <span className="font-semibold" style={{ color: 'var(--navy)' }}>{deactivateTarget?.name}</span>?
+          </p>
+          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+            Deactivated users cannot log in. Their activity history is preserved and they can be reactivated at any time.
+          </p>
+          <div className="flex gap-3 justify-end pt-1">
+            <Button variant="outline" onClick={() => setDeactivateTarget(null)}>Cancel</Button>
+            <Button
+              loading={deactivating}
+              onClick={handleDeactivateConfirm}
+              style={{ background: 'var(--rust)', color: 'white' }}
+            >
+              {deactivating ? 'Deactivating…' : 'Deactivate User'}
+            </Button>
+          </div>
+        </div>
       </Modal>
 
       {/* Archive Confirmation Modal */}

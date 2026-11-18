@@ -85,6 +85,12 @@ export class BillsService {
       });
     }
 
+    if (dto.vendorId) {
+      const vendor = await this.prisma.vendor.findUnique({ where: { id: dto.vendorId } });
+      if (!vendor) throw new NotFoundException('Vendor not found');
+      if (!vendor.isActive || vendor.isArchived) throw new BadRequestException('Vendor is not active');
+    }
+
     const status = (role === 'admin' && dto.status && ['pending', 'approved'].includes(dto.status))
       ? dto.status
       : 'pending';

@@ -29,8 +29,13 @@ export class SitesController {
 
   // All roles — list all sites
   @Get()
-  findAll(@Query('page') page?: string, @Query('limit') limit?: string) {
-    return this.sitesService.findAll(Number(page) || 1, Number(limit) || 20);
+  findAll(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+    @Query('status') status?: string,
+  ) {
+    return this.sitesService.findAll(Number(page) || 1, Number(limit) || 20, search, status);
   }
 
   // All roles — list active sites (used by vendor at invoice creation)

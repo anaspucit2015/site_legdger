@@ -29,8 +29,13 @@ export class UsersController {
 
   @Roles('admin', 'accountant')
   @Get()
-  findAll(@Query('page') page?: string, @Query('limit') limit?: string) {
-    return this.usersService.findAll(Number(page) || 1, Number(limit) || 20);
+  findAll(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('status') status?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.usersService.findAll(Number(page) || 1, Number(limit) || 20, status, search);
   }
 
   @Roles('admin', 'accountant')

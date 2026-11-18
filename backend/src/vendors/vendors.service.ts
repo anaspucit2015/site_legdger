@@ -16,11 +16,17 @@ export class VendorsService {
     });
   }
 
-  async findAll(page = 1, limit = 20) {
+  async findAll(page = 1, limit = 20, search?: string, status?: string) {
     const skip = (page - 1) * limit;
+    const where: Prisma.VendorWhereInput = {};
+    if (search) where.name = { contains: search, mode: 'insensitive' };
+    if (status === 'archived') where.isArchived = true;
+    else if (status === 'active') { where.isActive = true; where.isArchived = false; }
+    else if (status === 'inactive') { where.isActive = false; where.isArchived = false; }
+    else where.isArchived = false; // 'all' (default) hides archived
     const [data, total] = await Promise.all([
-      this.prisma.vendor.findMany({ orderBy: { name: 'asc' }, skip, take: limit }),
-      this.prisma.vendor.count(),
+      this.prisma.vendor.findMany({ where, orderBy: { name: 'asc' }, skip, take: limit }),
+      this.prisma.vendor.count({ where }),
     ]);
     return { data, total, page, limit };
   }
