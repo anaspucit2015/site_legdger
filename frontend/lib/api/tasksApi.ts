@@ -24,11 +24,12 @@ export type RateHistory = {
 
 export const tasksApi = baseApi.injectEndpoints({
   endpoints: (build) => ({
-    getTasks: build.query<PaginatedResult<Task>, { page?: number; limit?: number } | void>({
+    getTasks: build.query<PaginatedResult<Task>, { page?: number; limit?: number; status?: string } | void>({
       query: (params) => {
         const qs = new URLSearchParams();
         if (params?.page) qs.set('page', String(params.page));
         if (params?.limit) qs.set('limit', String(params.limit));
+        if (params?.status) qs.set('status', params.status);
         const str = qs.toString();
         return str ? `/tasks?${str}` : '/tasks';
       },

@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useGetTasksQuery, useCreateTaskMutation, useUpdateTaskMutation, useDeactivateTaskMutation, Task } from '@/lib/api/tasksApi';
 import {
   Button, Input, Modal,
@@ -7,21 +7,23 @@ import {
   PageHeader, Pagination,
 } from '@/components/ui';
 import { Plus } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function AdminTasksPage() {
   const [page, setPage] = useState(1);
-  const { data: result, isLoading } = useGetTasksQuery({ page });
   const [filter, setFilter] = useState<'all' | 'active' | 'inactive'>('all');
-  const allTasks = (result && 'data' in result ? result.data : result) ?? [];
-  const total    = (result && 'total' in result ? result.total : 0) ?? 0;
-  const tasks    = allTasks.filter((t) =>
-    filter === 'all' ? true : filter === 'active' ? t.isActive : !t.isActive,
-  );
+  const { data: result, isLoading } = useGetTasksQuery({ page, status: filter });
+  const tasks = (result && 'data' in result ? result.data : result) ?? [];
+  const total = (result && 'total' in result ? result.total : 0) ?? 0;
+
+  useEffect(() => { setPage(1); }, [filter]);
+
   const [createTask, { isLoading: creating }] = useCreateTaskMutation();
   const [updateTask] = useUpdateTaskMutation();
-  const [deactivate] = useDeactivateTaskMutation();
+  const [deactivate, { isLoading: deactivating }] = useDeactivateTaskMutation();
   const [showForm, setShowForm] = useState(false);
   const [editTarget, setEditTarget] = useState<Task | null>(null);
+  const [deactivateTarget, setDeactivateTarget] = useState<Task | null>(null);
   const [form, setForm] = useState({ name: '', unit: '', unitCost: '' });
   const [editRate, setEditRate] = useState('');
 
@@ -37,6 +39,18 @@ export default function AdminTasksPage() {
     await updateTask({ id: editTarget.id, unitCost: editRate }).unwrap();
     setEditTarget(null);
     setEditRate('');
+  }
+
+  async function handleDeactivateConfirm() {
+    if (!deactivateTarget) return;
+    try {
+      await deactivate(deactivateTarget.id).unwrap();
+      toast.success('Task deactivated successfully.');
+      setDeactivateTarget(null);
+    } catch (err: any) {
+      toast.error(err?.data?.message ?? 'Failed to deactivate task.');
+      setDeactivateTarget(null);
+    }
   }
 
   return (
@@ -126,7 +140,7 @@ export default function AdminTasksPage() {
                       </Button>
                     )}
                     {t.isActive && (
-                      <Button size="sm" variant="ghost" onClick={() => deactivate(t.id)} style={{ color: 'var(--rust)' }}>
+                      <Button size="sm" variant="ghost" onClick={() => setDeactivateTarget(t)} style={{ color: 'var(--rust)' }}>
                         Deactivate
                       </Button>
                     )}
@@ -168,6 +182,29 @@ export default function AdminTasksPage() {
             <Button type="submit" loading={creating}>{creating ? 'Creating…' : 'Create Task'}</Button>
           </div>
         </form>
+      </Modal>
+
+      {/* Deactivate Confirmation Modal */}
+      <Modal open={!!deactivateTarget} onClose={() => setDeactivateTarget(null)} title="Deactivate Task">
+        <div className="space-y-4">
+          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+            Are you sure you want to deactivate{' '}
+            <span className="font-semibold" style={{ color: 'var(--navy)' }}>{deactivateTarget?.name}</span>?
+          </p>
+          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+            Deactivated tasks are hidden from the task catalogue and cannot be selected for new invoices or bills. Their historical data is preserved.
+          </p>
+          <div className="flex gap-3 justify-end pt-1">
+            <Button variant="outline" onClick={() => setDeactivateTarget(null)}>Cancel</Button>
+            <Button
+              loading={deactivating}
+              onClick={handleDeactivateConfirm}
+              style={{ background: 'var(--rust)', color: 'white' }}
+            >
+              {deactivating ? 'Deactivating…' : 'Deactivate Task'}
+            </Button>
+          </div>
+        </div>
       </Modal>
 
       {/* Edit rate modal */}

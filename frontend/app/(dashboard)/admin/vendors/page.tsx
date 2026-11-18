@@ -17,8 +17,9 @@ import {
   Table, THead, TBody, Th, Tr, Td, TableLoading,
   PageHeader, Pagination,
 } from '@/components/ui';
-import { Plus, BookOpen, MoreHorizontal } from 'lucide-react';
+import { Plus, BookOpen, MoreHorizontal, Search } from 'lucide-react';
 import { toast } from 'sonner';
+import { useDebounce } from '@/lib/hooks/useDebounce';
 
 type Filter = 'all' | 'active' | 'inactive' | 'archived';
 
@@ -132,13 +133,18 @@ function DetailRow({ label, value, mono }: { label: string; value: string | null
 
 export default function AdminVendorsPage() {
   const [page, setPage] = useState(1);
-  const { data: result, isLoading } = useGetVendorsQuery({ page });
+  const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 400);
+  const [filter, setFilter] = useState<Filter>('all');
+  const { data: result, isLoading } = useGetVendorsQuery({ page, search: debouncedSearch || undefined, status: filter });
   const vendors = result?.data ?? [];
   const total = result?.total ?? 0;
 
+  useEffect(() => { setPage(1); }, [debouncedSearch, filter]);
+
   const [createVendor, { isLoading: creating }] = useCreateVendorMutation();
   const [updateVendor] = useUpdateVendorMutation();
-  const [deactivate] = useDeactivateVendorMutation();
+  const [deactivate, { isLoading: deactivating }] = useDeactivateVendorMutation();
   const [archiveVendor, { isLoading: archiving }] = useArchiveVendorMutation();
   const [giveAdvance, { isLoading: givingAdvance }] = useGiveAdvanceMutation();
   const [applyAdvance, { isLoading: applyingAdvance }] = useApplyAdvanceMutation();
@@ -148,17 +154,10 @@ export default function AdminVendorsPage() {
   const [editTarget, setEditTarget] = useState<Vendor | null>(null);
   const [detailsTarget, setDetailsTarget] = useState<Vendor | null>(null);
   const [archiveTarget, setArchiveTarget] = useState<Vendor | null>(null);
+  const [deactivateTarget, setDeactivateTarget] = useState<Vendor | null>(null);
   const [advanceTarget, setAdvanceTarget] = useState<Vendor | null>(null);
   const [applyAdvanceTarget, setApplyAdvanceTarget] = useState<Vendor | null>(null);
   const [payVendorTarget, setPayVendorTarget] = useState<Vendor | null>(null);
-  const [filter, setFilter] = useState<Filter>('all');
-
-  const filtered = vendors.filter((v) => {
-    if (filter === 'archived') return v.isArchived;
-    if (filter === 'active')   return v.isActive && !v.isArchived;
-    if (filter === 'inactive') return !v.isActive && !v.isArchived;
-    return !v.isArchived;
-  });
 
   const [form, setForm] = useState({ name: '', contactPerson: '', phone: '', email: '', address: '', bankName: '', accountTitle: '', accountNumber: '', iban: '', branchCode: '', currentBalance: '' });
   const [formError, setFormError] = useState('');
@@ -234,12 +233,15 @@ export default function AdminVendorsPage() {
     }
   }
 
-  async function handleDeactivate(id: string) {
+  async function handleDeactivateConfirm() {
+    if (!deactivateTarget) return;
     try {
-      await deactivate(id).unwrap();
+      await deactivate(deactivateTarget.id).unwrap();
       toast.success('Vendor deactivated successfully.');
+      setDeactivateTarget(null);
     } catch (err: any) {
       toast.error(err?.data?.message ?? 'Failed to deactivate vendor.');
+      setDeactivateTarget(null);
     }
   }
 
@@ -325,6 +327,15 @@ export default function AdminVendorsPage() {
         subtitle="Manage vendors / contractors"
         action={
           <div className="flex gap-2">
+            <div className="relative" style={{ width: 220 }}>
+              <Search size={15} className="absolute top-1/2 -translate-y-1/2 left-3" style={{ color: 'var(--text-muted)' }} />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search vendors…"
+                className="pl-9"
+              />
+            </div>
             <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'var(--border)' }}>
               {(['all', 'active', 'inactive', 'archived'] as Filter[]).map((f) => {
                 const active = filter === f;
@@ -369,7 +380,7 @@ export default function AdminVendorsPage() {
             </tr>
           </THead>
           <TBody>
-            {filtered.map((v) => {
+            {vendors.map((v) => {
               const badge = statusBadge(v);
               const outstanding = Number(v.currentBalance);
               const advance = Number(v.advanceBalance);
@@ -418,7 +429,7 @@ export default function AdminVendorsPage() {
                               ...(outstanding === 0 ? [{ label: 'Give Advance', color: '#1e6e49', onClick: () => { setAdvanceTarget(v); setAdvanceForm({ amount: '', notes: '' }); } }] : []),
                               ...(advance > 0 && outstanding > 0 ? [{ label: 'Apply Advance', color: '#1b3a7a', onClick: () => { setApplyAdvanceTarget(v); setApplyAdvanceForm({ amount: '', notes: '' }); } }] : []),
                               ...(outstanding > 0 ? [{ label: 'Pay Vendor', onClick: () => { setPayVendorTarget(v); setPayVendorForm({ amount: '', paymentMethod: '', paymentRef: '', invoiceReferenceNote: '', notes: '' }); } }] : []),
-                              { label: 'Deactivate', color: 'var(--text-muted)', onClick: () => handleDeactivate(v.id) },
+                              { label: 'Deactivate', color: 'var(--text-muted)', onClick: () => setDeactivateTarget(v) },
                             ] : [
                               { label: 'Reactivate', color: '#1e6e49', onClick: () => handleReactivate(v.id) },
                             ]),
@@ -607,6 +618,29 @@ export default function AdminVendorsPage() {
             </div>
           );
         })()}
+      </Modal>
+
+      {/* Deactivate Confirmation Modal */}
+      <Modal open={!!deactivateTarget} onClose={() => setDeactivateTarget(null)} title="Deactivate Vendor">
+        <div className="space-y-4">
+          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+            Are you sure you want to deactivate{' '}
+            <span className="font-semibold" style={{ color: 'var(--navy)' }}>{deactivateTarget?.name}</span>?
+          </p>
+          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+            Deactivated vendors are hidden from the vendor dropdown and cannot be selected for new invoices, bills, or payments. Their historical data is preserved and they can be reactivated at any time.
+          </p>
+          <div className="flex gap-3 justify-end pt-1">
+            <Button variant="outline" onClick={() => setDeactivateTarget(null)}>Cancel</Button>
+            <Button
+              loading={deactivating}
+              onClick={handleDeactivateConfirm}
+              style={{ background: 'var(--rust)', color: 'white' }}
+            >
+              {deactivating ? 'Deactivating…' : 'Deactivate Vendor'}
+            </Button>
+          </div>
+        </div>
       </Modal>
 
       {/* Archive Confirmation Modal */}

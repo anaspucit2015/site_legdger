@@ -13,11 +13,13 @@ export type User = {
 
 export const usersApi = baseApi.injectEndpoints({
   endpoints: (build) => ({
-    getUsers: build.query<PaginatedResult<User>, { page?: number; limit?: number } | void>({
+    getUsers: build.query<PaginatedResult<User>, { page?: number; limit?: number; status?: string; search?: string } | void>({
       query: (params) => {
         const qs = new URLSearchParams();
         if (params?.page) qs.set('page', String(params.page));
         if (params?.limit) qs.set('limit', String(params.limit));
+        if (params?.status) qs.set('status', params.status);
+        if (params?.search) qs.set('search', params.search);
         const str = qs.toString();
         return str ? `/users?${str}` : '/users';
       },
