@@ -15,9 +15,9 @@ import { InvoiceDetailModal } from '@/components/invoice-detail-modal';
 import { BillDetailModal } from '@/components/bill-detail-modal';
 import {
   SearchableSelect, Table, THead, TBody, Th, Tr, Td, TableEmpty, TableLoading,
-  Pagination, PageHeader, Button, Modal, Textarea, Select,
+  Pagination, PageHeader, Button, Modal, Textarea, Select, Input,
 } from '@/components/ui';
-import { Eye, TrendingDown, CheckCircle, Clock, XCircle, Check, X, Download, FileText, ReceiptText, Pencil, ChevronDown } from 'lucide-react';
+import { Eye, TrendingDown, CheckCircle, Clock, XCircle, Check, X, Download, FileText, ReceiptText, Pencil, ChevronDown, Calendar } from 'lucide-react';
 import { getToken } from '@/lib/auth';
 
 type Props = { type: 'site' | 'vendor' };
@@ -33,6 +33,10 @@ const REJECTION_REASONS = [
 
 function fmt(n: number) {
   return `Rs. ${n.toLocaleString()}`;
+}
+
+function fmtShortDate(iso: string) {
+  return new Date(iso + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
 function SummaryCard({
@@ -76,6 +80,10 @@ function StatusCards({ s, unit }: { s: BalanceSubSummary; unit?: string }) {
 
 export function BalanceReport({ type }: Props) {
   const [selectedId, setSelectedId] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const dateRangeInvalid = !!dateFrom && !!dateTo && dateFrom > dateTo;
+  const hasDateRange = !!dateFrom || !!dateTo;
   const [activeTab, setActiveTab] = useState<'invoices' | 'bills'>('invoices');
   const [invPage, setInvPage] = useState(1);
   const [billPage, setBillPage] = useState(1);
@@ -172,6 +180,8 @@ export function BalanceReport({ type }: Props) {
       const params = new URLSearchParams();
       if (type === 'site')   params.set('siteId',   selectedId);
       if (type === 'vendor') params.set('vendorId', selectedId);
+      if (type === 'vendor' && dateFrom) params.set('dateFrom', dateFrom);
+      if (type === 'vendor' && dateTo)   params.set('dateTo',   dateTo);
 
       const base = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
       const res = await fetch(
@@ -189,7 +199,8 @@ export function BalanceReport({ type }: Props) {
       const url  = URL.createObjectURL(blob);
       const a    = document.createElement('a');
       a.href     = url;
-      a.download = `balance-${selectedLabel ?? selectedId}-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      const rangeSuffix = dateFrom && dateTo ? `-${dateFrom}-to-${dateTo}` : dateTo ? `-as-of-${dateTo}` : dateFrom ? `-from-${dateFrom}` : '';
+      a.download = `balance-${selectedLabel ?? selectedId}${rangeSuffix}-${new Date().toISOString().slice(0, 10)}.xlsx`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -205,9 +216,13 @@ export function BalanceReport({ type }: Props) {
     setDownloadAllError('');
     setDownloadingAll(true);
     try {
+      const params = new URLSearchParams();
+      if (type === 'vendor' && dateFrom) params.set('dateFrom', dateFrom);
+      if (type === 'vendor' && dateTo)   params.set('dateTo',   dateTo);
+
       const base = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
       const res = await fetch(
-        `${base}/reports/balance/${type === 'site' ? 'sites' : 'vendors'}`,
+        `${base}/reports/balance/${type === 'site' ? 'sites' : 'vendors'}${params.toString() ? `?${params}` : ''}`,
         { headers: { Authorization: `Bearer ${getToken()}` } },
       );
 
@@ -221,7 +236,11 @@ export function BalanceReport({ type }: Props) {
       const url  = URL.createObjectURL(blob);
       const a    = document.createElement('a');
       a.href     = url;
-      a.download = `all-${type === 'site' ? 'sites' : 'vendors'}-balance-report-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      const rangeSuffix = type === 'vendor' && dateFrom && dateTo ? `-${dateFrom}-to-${dateTo}`
+        : type === 'vendor' && dateTo   ? `-as-of-${dateTo}`
+        : type === 'vendor' && dateFrom ? `-from-${dateFrom}`
+        : '';
+      a.download = `all-${type === 'site' ? 'sites' : 'vendors'}-balance-report${rangeSuffix}-${new Date().toISOString().slice(0, 10)}.xlsx`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -259,15 +278,81 @@ export function BalanceReport({ type }: Props) {
             : 'Select a vendor to view its complete financial balance report'
         }
         action={
-          <div className="flex flex-col items-end gap-1.5">
-            <Button variant="outline" loading={downloadingAll} onClick={handleDownloadAll}>
-              <Download size={14} />
-              {downloadingAll ? 'Generating…' : `Download All ${type === 'site' ? 'Sites' : 'Vendors'} Report`}
-            </Button>
-            {downloadAllError && (
-              <p className="text-xs" style={{ color: 'var(--rust)' }}>{downloadAllError}</p>
-            )}
-          </div>
+          type === 'vendor' ? (
+            <div className="flex flex-col items-end gap-2">
+              <div
+                className="flex items-end gap-3 p-3 rounded-xl"
+                style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}
+              >
+                <div className="flex flex-col gap-1">
+                  <p className="text-xs font-semibold flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
+                    <Calendar size={12} /> Download with date range
+                  </p>
+                  <div className="flex items-stretch gap-2">
+                    <Input
+                      type="date"
+                      value={dateFrom}
+                      max={dateTo || undefined}
+                      onChange={(e) => setDateFrom(e.target.value)}
+                      style={{ width: 150 }}
+                    />
+                    <span className="self-center" style={{ color: 'var(--text-muted)' }}>→</span>
+                    <Input
+                      type="date"
+                      value={dateTo}
+                      min={dateFrom || undefined}
+                      onChange={(e) => setDateTo(e.target.value)}
+                      style={{ width: 150 }}
+                    />
+                    {hasDateRange && (
+                      <button
+                        type="button"
+                        onClick={() => { setDateFrom(''); setDateTo(''); }}
+                        title="Clear date range"
+                        className="flex items-center justify-center rounded-lg shrink-0 transition-colors"
+                        style={{
+                          width: 38,
+                          background: 'white',
+                          border: '1.5px solid var(--border)',
+                          color: 'var(--text-muted)',
+                          cursor: 'pointer',
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--rust)'; e.currentTarget.style.borderColor = 'var(--rust)'; e.currentTarget.style.color = 'white'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = 'white'; e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-muted)'; }}
+                      >
+                        <X size={15} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <Button variant="outline" loading={downloadingAll} disabled={dateRangeInvalid} onClick={handleDownloadAll}>
+                  <Download size={14} />
+                  {downloadingAll ? 'Generating…' : 'Download All Vendors Report'}
+                </Button>
+              </div>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                {dateRangeInvalid
+                  ? <span style={{ color: 'var(--rust)' }}>Start Date must be on or before End Date.</span>
+                  : dateFrom && dateTo ? 'Reconstructs opening + closing balance for this window. Applies to this and the single-vendor report below.'
+                  : dateTo   ? 'Shows the balance as it stood at the end of this date. Applies to this and the single-vendor report below.'
+                  : dateFrom ? 'Shows activity from this date onward, through today.'
+                  : 'Optional — leave blank to use the live balance across full history.'}
+              </p>
+              {downloadAllError && (
+                <p className="text-xs" style={{ color: 'var(--rust)' }}>{downloadAllError}</p>
+              )}
+            </div>
+          ) : (
+            <div className="flex flex-col items-end gap-1.5">
+              <Button variant="outline" loading={downloadingAll} onClick={handleDownloadAll}>
+                <Download size={14} />
+                {downloadingAll ? 'Generating…' : 'Download All Sites Report'}
+              </Button>
+              {downloadAllError && (
+                <p className="text-xs" style={{ color: 'var(--rust)' }}>{downloadAllError}</p>
+              )}
+            </div>
+          )
         }
       />
 
@@ -306,6 +391,17 @@ export function BalanceReport({ type }: Props) {
                   </p>
                 </div>
                 <div className="shrink-0 flex flex-col items-end gap-2">
+                  {type === 'vendor' && hasDateRange && (
+                    <div
+                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
+                      style={{ background: 'rgba(255,255,255,0.12)', color: 'white' }}
+                    >
+                      <Calendar size={11} />
+                      {dateFrom && dateTo ? `${fmtShortDate(dateFrom)} → ${fmtShortDate(dateTo)}`
+                        : dateTo ? `As of ${fmtShortDate(dateTo)}`
+                        : `From ${fmtShortDate(dateFrom)}`}
+                    </div>
+                  )}
                   <div className="flex gap-2">
                     {type === 'site' && (
                       <button
@@ -328,13 +424,13 @@ export function BalanceReport({ type }: Props) {
                     <button
                       type="button"
                       onClick={handleDownload}
-                      disabled={downloading}
+                      disabled={downloading || dateRangeInvalid}
                       className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all"
                       style={{
                         background: downloading ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.15)',
                         color: 'white',
                         border: '1.5px solid rgba(255,255,255,0.25)',
-                        cursor: downloading ? 'not-allowed' : 'pointer',
+                        cursor: (downloading || dateRangeInvalid) ? 'not-allowed' : 'pointer',
                       }}
                       onMouseEnter={(e) => { if (!downloading) e.currentTarget.style.background = 'rgba(255,255,255,0.22)'; }}
                       onMouseLeave={(e) => { if (!downloading) e.currentTarget.style.background = 'rgba(255,255,255,0.15)'; }}

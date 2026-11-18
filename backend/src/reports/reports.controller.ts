@@ -25,11 +25,14 @@ export class ReportsController {
   async downloadBalanceReport(
     @Query('siteId')   siteId:   string | undefined,
     @Query('vendorId') vendorId: string | undefined,
+    @Query('dateFrom') dateFrom: string | undefined,
+    @Query('dateTo')   dateTo:   string | undefined,
     @Res() res: Response,
   ) {
-    const buffer = await this.reportsService.generateBalanceReport({ siteId, vendorId });
+    const buffer = await this.reportsService.generateBalanceReport({ siteId, vendorId, dateFrom, dateTo });
     const label  = siteId ? `site-${siteId}` : `vendor-${vendorId}`;
-    const filename = `balance-report-${label}-${new Date().toISOString().slice(0, 10)}.xlsx`;
+    const datePart = dateFrom && dateTo ? `-${dateFrom}-to-${dateTo}` : dateTo ? `-as-of-${dateTo}` : dateFrom ? `-from-${dateFrom}` : '';
+    const filename = `balance-report-${label}${datePart}-${new Date().toISOString().slice(0, 10)}.xlsx`;
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.send(buffer);
@@ -45,9 +48,14 @@ export class ReportsController {
   }
 
   @Get('balance/vendors')
-  async downloadAllVendorsBalanceReport(@Res() res: Response) {
-    const buffer = await this.reportsService.generateAllVendorsBalanceReport();
-    const filename = `vendors-balance-report-${new Date().toISOString().slice(0, 10)}.xlsx`;
+  async downloadAllVendorsBalanceReport(
+    @Query('dateFrom') dateFrom: string | undefined,
+    @Query('dateTo')   dateTo:   string | undefined,
+    @Res() res: Response,
+  ) {
+    const buffer = await this.reportsService.generateAllVendorsBalanceReport(dateFrom, dateTo);
+    const datePart = dateFrom && dateTo ? `-${dateFrom}-to-${dateTo}` : dateTo ? `-as-of-${dateTo}` : dateFrom ? `-from-${dateFrom}` : '';
+    const filename = `vendors-balance-report${datePart}-${new Date().toISOString().slice(0, 10)}.xlsx`;
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.send(buffer);
